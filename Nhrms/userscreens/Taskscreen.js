@@ -30,7 +30,6 @@ import { BASE_URL } from "../api/config";  // ADD THIS
 const STATUS_COLORS = {
   "To Do": { bg: "#FFF3ED", text: "#3B82F6", dot: "#3B82F6" },
   "In Progress": { bg: "#FFF8E1", text: "#F59E0B", dot: "#F59E0B" },
-  Review: { bg: "#FEF3C7", text: "#D97706", dot: "#D97706" },
   Done: { bg: "#ECFDF5", text: "#10B981", dot: "#10B981" },
 };
 
@@ -41,14 +40,14 @@ const PRIORITY_COLORS = {
   Urgent: { bg: "#FCE7F3", text: "#E11D48" },
 };
 
-const ALL_STATUSES = ["To Do", "In Progress", "Review", "Done"];
+const ALL_STATUSES = ["To Do", "In Progress", "Done"];
 const ALL_PRIORITIES = ["High", "Medium", "Low", "Urgent"];
 
 function formatStatus(status = "") {
   const s = status.toLowerCase();
   if (s === "todo") return "To Do";
   if (s === "in-progress") return "In Progress";
-  if (s === "review") return "Review";
+  if (s === "review") return "In Progress";
   if (s === "done") return "Done";
   return "To Do";
 }
@@ -57,7 +56,6 @@ function backendStatus(status = "") {
   const s = status.toLowerCase();
   if (s === "to do") return "todo";
   if (s === "in progress") return "in-progress";
-  if (s === "review") return "review";
   if (s === "done") return "done";
   return "todo";
 }
@@ -108,8 +106,7 @@ function TaskCard({ task, onUpdate }) {
   const pc = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.Medium;
   const progressColor =
     task.status === "Done" ? "#10B981" :
-      task.status === "In Progress" ? "#F59E0B" :
-        task.status === "Review" ? "#D97706" : "#3B82F6";
+      task.status === "In Progress" ? "#F59E0B" : "#3B82F6";
 
   return (
     <View style={cardS.wrap}>
@@ -118,7 +115,7 @@ function TaskCard({ task, onUpdate }) {
           <Text style={{ fontSize: 14 }}>
             {task.status === "Done" ? "✅" :
               task.status === "In Progress" ? "⚡" :
-                task.status === "Review" ? "📝" : "📋"}
+                "📋"}
           </Text>
         </View>
         <Text style={cardS.title} numberOfLines={2}>{task.title}</Text>
@@ -382,14 +379,12 @@ export default function Taskscreen() {
     { label: "All", count: tasks.length },
     { label: "To Do", count: tasks.filter((t) => t.status === "To Do").length },
     { label: "In Progress", count: tasks.filter((t) => t.status === "In Progress").length },
-    { label: "Review", count: tasks.filter((t) => t.status === "Review").length },
     { label: "Done", count: tasks.filter((t) => t.status === "Done").length },
   ]), [tasks]);
 
   const filtered = filter === "All" ? tasks : tasks.filter((t) => t.status === filter);
   const toDo = tasks.filter((t) => t.status === "To Do").length;
   const inProgress = tasks.filter((t) => t.status === "In Progress").length;
-  const review = tasks.filter((t) => t.status === "Review").length;
   const done = tasks.filter((t) => t.status === "Done").length;
 
   const handleUpdate = async (updated) => {
@@ -449,7 +444,6 @@ export default function Taskscreen() {
             {[
               { label: "To Do", count: toDo, emoji: "🔴" },
               { label: "In Progress", count: inProgress, emoji: "🟡" },
-              { label: "Review", count: review, emoji: "🟠" },
               { label: "Done", count: done, emoji: "🟢" },
             ].map((item) => (
               <View key={item.label} style={s.summaryItem}>
@@ -564,3 +558,4 @@ const s = StyleSheet.create({
   emptyEmoji: { fontSize: 40, marginBottom: 10 },
   emptyText: { fontSize: 15, color: "#9CA3AF", fontWeight: "600" },
 });
+

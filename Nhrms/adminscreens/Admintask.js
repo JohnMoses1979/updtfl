@@ -54,7 +54,6 @@ const priorityMap = {
 const statusMap = {
   'in-progress': { color: C.info, label: 'In Progress' },
   todo: { color: C.accent, label: 'To Do' },
-  review: { color: C.warning, label: 'Review' },
   done: { color: C.success, label: 'Done' },
 };
 
@@ -155,6 +154,9 @@ function Chip({ label, color }) {
 }
 
 function mapAdminTask(task, index) {
+  const normalizedStatus = String(task.status || 'todo').toLowerCase() === 'review'
+    ? 'in-progress'
+    : (task.status || 'todo');
   return {
     id: String(task.id),
     title: task.title || '',
@@ -164,7 +166,7 @@ function mapAdminTask(task, index) {
     assigneeEmployeeDbId: task.assigneeEmployeeDbId || task.assigneeId || null,
     due: task.dueText || '—',
     priority: (task.priority || 'medium').toLowerCase(),
-    status: task.status || 'todo',
+    status: normalizedStatus,
     progress: Math.max(0, Math.min(1, (task.progress || 0) / 100)),
     comments: task.commentsCount || 0,
     color: ACCENT_COLORS[index % ACCENT_COLORS.length],
@@ -187,7 +189,7 @@ export default function TasksScreen({ onBack }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const filters = ['all', 'todo', 'in-progress', 'review', 'done'];
+  const filters = ['all', 'todo', 'in-progress', 'done'];
 
   const selectedEmployee = useMemo(() => {
     if (form.assigneeEmployeeDbId) {
@@ -217,7 +219,6 @@ export default function TasksScreen({ onBack }) {
     all: tasks.length,
     todo: tasks.filter((t) => t.status === 'todo').length,
     'in-progress': tasks.filter((t) => t.status === 'in-progress').length,
-    review: tasks.filter((t) => t.status === 'review').length,
     done: tasks.filter((t) => t.status === 'done').length,
   };
 
@@ -360,7 +361,7 @@ export default function TasksScreen({ onBack }) {
     try {
       setError('');
 
-      const order = ['todo', 'in-progress', 'review', 'done'];
+      const order = ['todo', 'in-progress', 'done'];
       const next = order[(order.indexOf(task.status) + 1) % order.length];
 
       const payload = {
@@ -402,10 +403,6 @@ export default function TasksScreen({ onBack }) {
         </View>
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={s.refreshHeaderBtn} onPress={handleRefreshAll}>
-            <Text style={{ color: '#FFF', fontSize: 18, lineHeight: 20 }}>↻</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={s.addHeaderBtn} onPress={openAdd}>
             <Text style={{ color: '#FFF', fontSize: 22, lineHeight: 24 }}>+</Text>
           </TouchableOpacity>
@@ -428,8 +425,8 @@ export default function TasksScreen({ onBack }) {
             {[
               { label: 'Total', value: tasks.length, color: C.accent },
               { label: 'Active', value: counts['in-progress'], color: C.info },
-              { label: 'Review', value: counts.review, color: C.warning },
               { label: 'Done', value: counts.done, color: C.success },
+              { label: 'To Do', value: counts.todo, color: C.accent },
             ].map((item) => (
               <View
                 key={item.label}
@@ -711,7 +708,13 @@ export default function TasksScreen({ onBack }) {
                   activeOpacity={0.85}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Text style={{ color: form.due ? C.textPrimary : C.textMuted, fontSize: 15 }}>
+                  <Text
+                    style={{
+                      color: form.due ? C.textPrimary : C.textMuted,
+                      fontSize: 15,
+                      flexShrink: 1,
+                    }}
+                  >
                     {form.due || 'Select due date'}
                   </Text>
                 </TouchableOpacity>
@@ -779,6 +782,8 @@ export default function TasksScreen({ onBack }) {
         value={form.due}
         onClose={() => setShowDatePicker(false)}
         onChange={(value) => setForm((p) => ({ ...p, due: value }))}
+        disableFuture={false}
+        maximumYear={new Date().getFullYear() + 10}
       />
 
       <Modal
@@ -908,14 +913,6 @@ const s = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: '#2F6E8E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshHeaderBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1a3a5c',
     alignItems: 'center',
     justifyContent: 'center',
   },

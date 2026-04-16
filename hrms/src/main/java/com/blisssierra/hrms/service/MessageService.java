@@ -211,6 +211,20 @@ public class MessageService {
                 .toList();
     }
 
+    public List<MessageResponseDto> getUnreadMessagesForEmployee(String employeeId) {
+        return adminMessageRepository.findByRecipientEmployeeIdAndIsReadFalseOrderByCreatedAtDesc(employeeId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    public void markMessageAsRead(Long messageId) {
+        AdminMessage message = adminMessageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+        message.setIsRead(true);
+        adminMessageRepository.save(message);
+    }
+
     /**
      * ISSUE 4 FIX: Scheduled cleanup — deletes messages older than 24 hours.
      * Runs every hour.

@@ -193,7 +193,7 @@ export default function ProfileScreen({ onBack, onNavigate }) {
         logout();
         onNavigate?.("logout");
       },
-    }, ,
+    },
   ];
   return (
     <SafeAreaView style={styles.safe}>

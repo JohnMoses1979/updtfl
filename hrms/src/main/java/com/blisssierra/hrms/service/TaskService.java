@@ -1,15 +1,13 @@
 package com.blisssierra.hrms.service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.TaskAdminRequest;
 import com.blisssierra.hrms.dto.TaskUserUpdateRequest;
 import com.blisssierra.hrms.entity.Employee;
@@ -39,11 +37,14 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
+    private final AdminNotificationService adminNotificationService;
 
     public TaskService(TaskRepository taskRepository,
-            EmployeeRepository employeeRepository) {
+            EmployeeRepository employeeRepository,
+            AdminNotificationService adminNotificationService) {
         this.taskRepository = taskRepository;
         this.employeeRepository = employeeRepository;
+        this.adminNotificationService = adminNotificationService;
     }
 
     // ── Admin queries ─────────────────────────────────────────────────────────
@@ -58,6 +59,58 @@ public class TaskService {
         }
         return taskRepository.findByAssigneeEmployeeIdIgnoreCaseOrderByUpdatedAtDesc(
                 employeeId.trim());
+    }
+
+    public List<NotificationDto> getUserTaskNotifications(String employeeId) {
+        if (employeeId == null || employeeId.trim().isEmpty()) {
+            return List.of();
+        }
+
+        return taskRepository
+                .findByAssigneeEmployeeIdIgnoreCaseAndAdminUpdatePendingForUserTrueOrderByUpdatedAtDesc(
+                        employeeId.trim())
+                .stream()
+                .map(task -> new NotificationDto(
+                        task.getId(),
+                        "TASK_ASSIGNED",
+                        task.getStatus() != null && !"todo".equalsIgnoreCase(task.getStatus())
+                                ? "Task updated by admin"
+                                : "New task assigned",
+                        task.getTitle(),
+                        false,
+                        task.getUpdatedAt(),
+                        task.getAssigneeId(),
+                        task.getAssigneeName(),
+                        task.getAssigneeEmployeeId(),
+                        null,
+                        null,
+                        task.getId(),
+                        "tasks"))
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationDto> getAdminTaskNotifications() {
+        return taskRepository.findByUserUpdatePendingForAdminTrueOrderByUpdatedAtDesc()
+                .stream()
+                .map(task -> new NotificationDto(
+                        task.getId(),
+                        "TASK_UPDATED",
+                        "Task updated by employee",
+                        String.format("%s updated \"%s\" to %s (%d%%)",
+                                task.getAssigneeName(),
+                                task.getTitle(),
+                                humanizeStatus(task.getStatus()),
+                                task.getProgress()),
+                        false,
+                        task.getUpdatedAt(),
+                        task.getAssigneeId(),
+                        task.getAssigneeName(),
+                        task.getAssigneeEmployeeId(),
+                        null,
+                        null,
+                        task.getId(),
+                        "tasks"))
+                .collect(Collectors.toList());
     }
 
     // ── Employee search (used by admin task assignment dropdown) ─────────────
@@ -113,6 +166,8 @@ public class TaskService {
         task.setStatus("todo");
         task.setProgress(0);
         task.setCommentsCount(0);
+        task.setAdminUpdatePendingForUser(true);
+        task.setUserUpdatePendingForAdmin(false);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
 
@@ -137,6 +192,8 @@ public class TaskService {
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             task.setStatus(normalizeStatus(request.getStatus()));
         }
+        task.setAdminUpdatePendingForUser(true);
+        task.setUserUpdatePendingForAdmin(false);
         task.setUpdatedAt(LocalDateTime.now());
 
         return taskRepository.save(task);
@@ -167,8 +224,35 @@ public class TaskService {
             task.setCommentsCount(task.getCommentsCount() + 1);
         }
 
+        task.setAdminUpdatePendingForUser(false);
+        task.setUserUpdatePendingForAdmin(true);
         task.setUpdatedAt(LocalDateTime.now());
-        return taskRepository.save(task);
+        Task updated = taskRepository.save(task);
+
+        adminNotificationService.createTaskUpdatedNotification(
+                updated,
+                String.format("%s (%s) updated \"%s\" to %s (%d%%).",
+                        updated.getAssigneeName(),
+                        updated.getAssigneeEmployeeId(),
+                        updated.getTitle(),
+                        humanizeStatus(updated.getStatus()),
+                        updated.getProgress()));
+
+        return updated;
+    }
+
+    public void markUserTaskNotificationAsRead(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+        task.setAdminUpdatePendingForUser(false);
+        taskRepository.save(task);
+    }
+
+    public void markAdminTaskNotificationAsRead(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+        task.setUserUpdatePendingForAdmin(false);
+        taskRepository.save(task);
     }
 
     public void deleteTask(Long taskId) {
@@ -190,11 +274,22 @@ public class TaskService {
 
     private String normalizeStatus(String status) {
         String s = status == null ? "todo" : status.trim().toLowerCase();
-        return List.of("todo", "in-progress", "review", "done").contains(s) ? s : "todo";
+        if ("review".equals(s) || "in review".equals(s)) {
+            return "in-progress";
+        }
+        return List.of("todo", "in-progress", "done").contains(s) ? s : "todo";
     }
 
     private String generateTaskCode() {
         return "T" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 8).toUpperCase();
+    }
+
+    private String humanizeStatus(String status) {
+        return switch (normalizeStatus(status)) {
+            case "in-progress" -> "In Progress";
+            case "done" -> "Done";
+            default -> "To Do";
+        };
     }
 }

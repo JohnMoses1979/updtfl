@@ -877,7 +877,7 @@ function StepBar({ step }) {
   );
 }
 
-function StepDetails({ form, setForm, onNext }) {
+function StepDetails({ form, setForm, onNext, onBack }) {
   const [passwordError, setPasswordError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -918,6 +918,12 @@ function StepDetails({ form, setForm, onNext }) {
 
   return (
     <View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <TouchableOpacity onPress={onBack} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 24, color: "#2F6E8E" }}>←</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+      </View>
       <Text style={styles.registrationTitle}>Registration</Text>
       <Text style={styles.title}>Your Details</Text>
       <Text style={styles.sub}>Fill your basic information</Text>
@@ -1458,7 +1464,7 @@ export function SignUpFlow({ onBack, goToSignIn }) {
           <StepBar step={step} />
 
           {step === 0 && (
-            <StepDetails form={form} setForm={setForm} onNext={() => setStep(1)} />
+            <StepDetails form={form} setForm={setForm} onNext={() => setStep(1)} onBack={onBack} />
           )}
 
           {step === 1 && (

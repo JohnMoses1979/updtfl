@@ -151,6 +151,13 @@ public class AttendanceApiService {
                 .stream().map(this::toDto).collect(Collectors.toList());
     }
 
+    public List<AttendanceRecordDto> getEmployeeHistory(String empId) {
+        String normId = empId.trim().toUpperCase();
+        return attendanceRepository
+                .findByEmpIdOrderByAttendanceDateDesc(normId)
+                .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
     // ── SALARY LOGIC (absorbed from Project B) ───────────────────────────────
 
     /**

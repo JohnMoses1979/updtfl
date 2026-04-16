@@ -55,6 +55,12 @@ public class Task {
     @Column(name = "comments_count", nullable = false)
     private Integer commentsCount = 0;
 
+    @Column(name = "admin_update_pending_for_user", nullable = false)
+    private Boolean adminUpdatePendingForUser = true;
+
+    @Column(name = "user_update_pending_for_admin", nullable = false)
+    private Boolean userUpdatePendingForAdmin = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

@@ -56,10 +56,25 @@ export const taskApi = {
   getUserTasks: (employeeId) =>
     request(`/tasks/user/${encodeURIComponent(employeeId)}`),
 
+  getUserTaskNotifications: (employeeId) =>
+    request(`/tasks/user/${encodeURIComponent(employeeId)}/notifications`),
+
   updateTaskByUser: (taskId, payload) =>
     request(`/tasks/user/${taskId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+
+  markUserTaskNotificationAsRead: (taskId) =>
+    request(`/tasks/user/${taskId}/notification-read`, {
+      method: "PUT",
+    }),
+
+  getAdminTaskNotifications: () => request("/tasks/admin/notifications"),
+
+  markAdminTaskNotificationAsRead: (taskId) =>
+    request(`/tasks/admin/notifications/${taskId}/read`, {
+      method: "PUT",
     }),
 
   // ── Performance helpers ───────────────────────────────────────────────────

@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+numpy
+pillow
+python-multipart
+# Keep this explicit because some environments miss the transitive model package.
+face-recognition-models @ git+https://github.com/ageitgey/face_recognition_models.git

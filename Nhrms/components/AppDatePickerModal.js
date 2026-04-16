@@ -314,7 +314,7 @@ const MONTH_NAMES = [
 ];
 
 const MIN_YEAR = 1950;
-const MAX_YEAR = new Date().getFullYear();
+const DEFAULT_MAX_YEAR = new Date().getFullYear();
 
 function parseDateValue(value) {
   if (!value || value === '—') return new Date();
@@ -344,12 +344,21 @@ function buildCalendarDays(visibleMonth) {
   return cells;
 }
 
-export default function AppDatePickerModal({ visible, value, onClose, onChange }) {
+export default function AppDatePickerModal({
+  visible,
+  value,
+  onClose,
+  onChange,
+  disableFuture = true,
+  maximumYear = DEFAULT_MAX_YEAR,
+}) {
   const initial = parseDateValue(value);
+  const maxYear = Math.max(initial.getFullYear(), maximumYear);
 
   const [selectedDate, setSelectedDate] = useState(initial);
   const [viewYear, setViewYear] = useState(initial.getFullYear());
   const [viewMonth, setViewMonth] = useState(initial.getMonth());
+  const [showYearPicker, setShowYearPicker] = useState(false);
 
   useEffect(() => {
     const parsed = parseDateValue(value);
@@ -362,6 +371,13 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
     () => buildCalendarDays(new Date(viewYear, viewMonth, 1)),
     [viewYear, viewMonth]
   );
+  const yearOptions = useMemo(() => {
+    const options = [];
+    for (let year = maxYear; year >= MIN_YEAR; year -= 1) {
+      options.push(year);
+    }
+    return options;
+  }, [maxYear]);
 
   // ── Month navigation ───────────────────────────────────────
   const goToPrevMonth = () => {
@@ -376,9 +392,9 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
 
   const goToNextMonth = () => {
     const now = new Date();
-    if (viewYear === now.getFullYear() && viewMonth === now.getMonth()) return; // don't go to future
+    if (disableFuture && viewYear === now.getFullYear() && viewMonth === now.getMonth()) return;
     if (viewMonth === 11) {
-      if (viewYear >= MAX_YEAR) return;
+      if (viewYear >= maxYear) return;
       setViewMonth(0);
       setViewYear((y) => y + 1);
     } else {
@@ -393,12 +409,13 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
   };
 
   const goToNextYear = () => {
-    if (viewYear >= MAX_YEAR) return;
+    if (viewYear >= maxYear) return;
     setViewYear((y) => y + 1);
   };
 
   // Is a day in the future? (disallow future selection)
   const isFuture = (date) => {
+    if (!disableFuture) return false;
     if (!date) return false;
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -417,7 +434,7 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
             </Pressable>
 
             <Text style={s.title}>
-              {MONTH_NAMES[viewMonth]}
+              {MONTH_NAMES[viewMonth]} {viewYear}
             </Text>
 
             <Pressable style={s.monthButton} onPress={goToNextMonth}>
@@ -435,12 +452,18 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
               <Text style={s.yearArrowText}>‹</Text>
             </Pressable>
 
-            <Text style={s.yearLabel}>{viewYear}</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={s.yearPickerBtn}
+              onPress={() => setShowYearPicker(true)}
+            >
+              <Text style={s.yearLabel}>{viewYear}</Text>
+            </TouchableOpacity>
 
             <Pressable
-              style={[s.yearArrow, viewYear >= MAX_YEAR && s.yearArrowDisabled]}
+              style={[s.yearArrow, viewYear >= maxYear && s.yearArrowDisabled]}
               onPress={goToNextYear}
-              disabled={viewYear >= MAX_YEAR}
+              disabled={viewYear >= maxYear}
             >
               <Text style={s.yearArrowText}>›</Text>
             </Pressable>
@@ -507,6 +530,42 @@ export default function AppDatePickerModal({ visible, value, onClose, onChange }
 
         </View>
       </View>
+
+      <Modal
+        visible={showYearPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowYearPicker(false)}
+      >
+        <View style={s.overlay}>
+          <View style={s.yearSheet}>
+            <Text style={s.yearSheetTitle}>Select Year</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {yearOptions.map((year) => (
+                <Pressable
+                  key={year}
+                  style={[s.yearOption, year === viewYear && s.yearOptionActive]}
+                  onPress={() => {
+                    setViewYear(year);
+                    setSelectedDate((prev) => {
+                      const lastDay = new Date(year, viewMonth + 1, 0).getDate();
+                      return new Date(year, viewMonth, Math.min(prev.getDate(), lastDay));
+                    });
+                    setShowYearPicker(false);
+                  }}
+                >
+                  <Text style={[s.yearOptionText, year === viewYear && s.yearOptionTextActive]}>
+                    {year}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable style={s.secondaryBtn} onPress={() => setShowYearPicker(false)}>
+              <Text style={s.secondaryText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -522,8 +581,8 @@ const s = StyleSheet.create({
   },
 
   // ── Month row ──
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  title: { color: '#F0EDE8', fontSize: 16, fontWeight: '800' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 10 },
+  title: { color: '#F0EDE8', fontSize: 18, fontWeight: '800', flex: 1, textAlign: 'center', flexWrap: 'wrap' },
   monthButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#17314d', alignItems: 'center', justifyContent: 'center' },
   monthButtonText: { color: '#F0EDE8', fontSize: 18, fontWeight: '700' },
 
@@ -533,6 +592,50 @@ const s = StyleSheet.create({
   yearArrowDisabled: { backgroundColor: '#0f1e30', opacity: 0.4 },
   yearArrowText: { color: '#F0EDE8', fontSize: 20, fontWeight: '700' },
   yearLabel: { color: '#2F6E8E', fontSize: 20, fontWeight: '900', minWidth: 60, textAlign: 'center' },
+  yearPickerBtn: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1a3a5c',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: '#13263b',
+  },
+  yearSheet: {
+    backgroundColor: '#0f1e30',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#1a3a5c',
+    maxHeight: '75%',
+  },
+  yearSheetTitle: {
+    color: '#F0EDE8',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  yearOption: {
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: '#13263b',
+    borderWidth: 1,
+    borderColor: '#1a3a5c',
+  },
+  yearOptionActive: {
+    backgroundColor: '#2F6E8E',
+    borderColor: '#2F6E8E',
+  },
+  yearOptionText: {
+    color: '#F0EDE8',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  yearOptionTextActive: {
+    color: '#ffffff',
+  },
 
   selectedLabel: { color: '#C8C4BE', fontSize: 13, marginBottom: 14 },
 

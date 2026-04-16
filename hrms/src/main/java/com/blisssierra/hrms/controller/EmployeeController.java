@@ -103,7 +103,6 @@ package com.blisssierra.hrms.controller;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,6 +124,7 @@ import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.ProfileUpdateRequest;
 import com.blisssierra.hrms.entity.Employee;
 import com.blisssierra.hrms.repository.EmployeeRepository;
+import com.blisssierra.hrms.service.AdminNotificationService;
 import com.blisssierra.hrms.service.EmployeeManagementService;
 
 import jakarta.validation.Valid;
@@ -140,6 +140,9 @@ public class EmployeeController {
 
     @Autowired
     private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AdminNotificationService adminNotificationService;
 
     // GET /api/employees
     @GetMapping
@@ -225,6 +228,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new RuntimeException("Employee not found: id=" + id));
         emp.setApproved(true);
         employeeRepository.save(emp);
+        adminNotificationService.createApprovalActionNotification(emp, true);
         log.info("✅ Employee approved: empId={}", emp.getEmpId());
         return ResponseEntity.ok(Map.of(
                 "status", "success",
@@ -244,6 +248,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new RuntimeException("Employee not found: id=" + id));
         String empId = emp.getEmpId();
         String name = emp.getName();
+        adminNotificationService.createApprovalActionNotification(emp, false);
         employeeRepository.delete(emp);
         log.info("❌ Employee rejected and deleted: empId={}", empId);
         return ResponseEntity.ok(Map.of(
@@ -259,26 +264,7 @@ public class EmployeeController {
     @GetMapping("/pending-approval")
     public ResponseEntity<List<NotificationDto>> getPendingApproval() {
         log.info("GET /api/employees/pending-approval");
-        List<Employee> pending = employeeRepository.findAll().stream()
-                .filter(e -> e.isVerified() && !e.isApproved())
-                .collect(Collectors.toList());
-
-        List<NotificationDto> notifications = pending.stream()
-                .map(e -> new NotificationDto(
-                        e.getId(),
-                        "SIGNUP_REQUEST",
-                        "New Employee Signup",
-                        e.getName() + " (" + e.getEmpId() + ") has signed up and is awaiting approval.",
-                        false,
-                        e.getCreatedAt(),
-                        e.getId(),
-                        e.getName(),
-                        e.getEmpId(),
-                        e.getEmail(),
-                        e.getDesignation()))
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(notifications);
+        return ResponseEntity.ok(adminNotificationService.getActiveSignupNotifications());
     }
 
     /**
@@ -288,26 +274,22 @@ public class EmployeeController {
     @GetMapping("/admin-notifications")
     public ResponseEntity<List<NotificationDto>> getAdminNotifications() {
         log.info("GET /api/employees/admin-notifications");
-        List<Employee> pending = employeeRepository.findAll().stream()
-                .filter(e -> e.isVerified() && !e.isApproved())
-                .collect(Collectors.toList());
+        return ResponseEntity.ok(adminNotificationService.getActiveNotifications());
+    }
 
-        List<NotificationDto> notifications = pending.stream()
-                .map(e -> new NotificationDto(
-                        e.getId(),
-                        "SIGNUP_REQUEST",
-                        "New Employee Signup Request",
-                        e.getName() + " (" + e.getEmpId() + ") | " + e.getDesignation()
-                                + " — awaiting approval",
-                        false,
-                        e.getCreatedAt(),
-                        e.getId(),
-                        e.getName(),
-                        e.getEmpId(),
-                        e.getEmail(),
-                        e.getDesignation()))
-                .collect(Collectors.toList());
+    @GetMapping("/admin-notifications/history")
+    public ResponseEntity<List<NotificationDto>> getAdminNotificationHistory() {
+        log.info("GET /api/employees/admin-notifications/history");
+        return ResponseEntity.ok(adminNotificationService.getHistoryNotifications());
+    }
 
-        return ResponseEntity.ok(notifications);
+    @PutMapping("/admin-notifications/{notificationId}/read")
+    public ResponseEntity<?> markAdminNotificationAsRead(@PathVariable Long notificationId) {
+        log.info("PUT /api/employees/admin-notifications/{}/read", notificationId);
+        adminNotificationService.markAsRead(notificationId);
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Notification marked as read",
+                "notificationId", notificationId));
     }
 }

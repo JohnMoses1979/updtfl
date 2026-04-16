@@ -36,4 +36,15 @@ public class MessageController {
     public ResponseEntity<List<MessageResponseDto>> getMessagesForEmployee(@PathVariable String employeeId) {
         return ResponseEntity.ok(messageService.getMessagesForEmployee(employeeId));
     }
+
+    @GetMapping("/employee/{employeeId}/notifications")
+    public ResponseEntity<List<MessageResponseDto>> getUnreadMessagesForEmployee(@PathVariable String employeeId) {
+        return ResponseEntity.ok(messageService.getUnreadMessagesForEmployee(employeeId));
+    }
+
+    @PutMapping("/{messageId}/read")
+    public ResponseEntity<MessageResponseDto> markMessageAsRead(@PathVariable Long messageId) {
+        messageService.markMessageAsRead(messageId);
+        return ResponseEntity.ok(new MessageResponseDto());
+    }
 }

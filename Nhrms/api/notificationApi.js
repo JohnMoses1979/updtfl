@@ -6,6 +6,9 @@ export const notificationApi = {
     getAdminNotifications: () =>
         request("/employees/admin-notifications"),
 
+    getAdminNotificationHistory: () =>
+        request("/employees/admin-notifications/history"),
+
     // Get pending approval employees
     getPendingApprovals: () =>
         request("/employees/pending-approval"),
@@ -24,7 +27,7 @@ export const notificationApi = {
 
     // Mark notification as read (kept for compatibility)
     markAsRead: (notificationId) =>
-        request(`/notifications/${notificationId}/read`, {
+        request(`/employees/admin-notifications/${notificationId}/read`, {
             method: "PUT",
-        }).catch(() => ({ status: "ok" })), // graceful fail if endpoint doesn't exist
+        }),
 };

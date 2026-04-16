@@ -1874,6 +1874,7 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   Alert,
   Modal,
@@ -1959,6 +1960,34 @@ function getDateLabel(date) {
 }
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function parseAttendanceDateTime(dateString, timeString) {
+  if (!timeString) return null;
+  const [h = "0", m = "0"] = String(timeString).split(":");
+  const base = dateString ? new Date(`${dateString}T00:00:00`) : new Date();
+  base.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+  return base;
+}
+
+function toHistoryEntry(record) {
+  const date = record?.date ? new Date(`${record.date}T00:00:00`) : new Date();
+  const checkInDate = parseAttendanceDateTime(record?.date, record?.checkIn);
+  const checkOutDate = parseAttendanceDateTime(record?.date, record?.checkOut);
+  const totalSeconds =
+    typeof record?.durationMinutes === "number" && record.durationMinutes >= 0
+      ? record.durationMinutes * 60
+      : checkInDate
+        ? Math.max(0, Math.floor((Date.now() - checkInDate.getTime()) / 1000))
+        : 0;
+
+  return {
+    id: record?.id ?? `${record?.date}-${record?.checkIn}-${record?.checkOut}`,
+    date,
+    totalSeconds,
+    checkin: checkInDate ? formatTime(checkInDate) : "--:-- --",
+    checkout: checkOutDate ? formatTime(checkOutDate) : "--:-- --",
+  };
+}
 
 // ─── Seed data (unchanged) ────────────────────────────────────
 const seedHistory = () => {
@@ -2781,17 +2810,18 @@ function HistoryCard({ entry }) {
 // userscreens/Attendance.js
 // Replace the CheckInScreen component with this version
 
-export default function CheckInScreen({ onTabPress, activeTab = 1 }) {
+function LegacyCheckInScreen({ onTabPress, activeTab = 1 }) {
   const { user } = useUser();
   const [isClockedIn, setIsClockedIn] = useState(false);
-  const [isCheckedOut, setIsCheckedOut] = useState(false); // NEW: track full completion
+  const [isCheckedOut, setIsCheckedOut] = useState(false);
   const [checkinTime, setCheckinTime] = useState(null);
-  const [checkoutTime, setCheckoutTime] = useState(null); // NEW
+  const [checkoutTime, setCheckoutTime] = useState(null);
   const [todaySeconds, setTodaySeconds] = useState(0);
-  const [periodSeconds, setPeriodSeconds] = useState(32 * 3600);
-  const [history, setHistory] = useState(seedHistory());
+  const [periodSeconds, setPeriodSeconds] = useState(0);
+  const [history, setHistory] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const timerRef = useRef(null);
 
   // ── NEW: Restore clock-in state from backend on mount ─────────────────────
@@ -2984,6 +3014,198 @@ export default function CheckInScreen({ onTabPress, activeTab = 1 }) {
 }
 
 // ─── Styles (100% original — zero changes) ───────────────────
+export default function CheckInScreen({ onTabPress, activeTab = 1 }) {
+  const { user } = useUser();
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [isCheckedOut, setIsCheckedOut] = useState(false);
+  const [checkinTime, setCheckinTime] = useState(null);
+  const [checkoutTime, setCheckoutTime] = useState(null);
+  const [todaySeconds, setTodaySeconds] = useState(0);
+  const [periodSeconds, setPeriodSeconds] = useState(0);
+  const [history, setHistory] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const timerRef = useRef(null);
+
+  const refreshAttendanceData = React.useCallback(async (showLoader = false) => {
+    if (!user?.empId) {
+      setStatusLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    if (showLoader) {
+      setStatusLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
+    try {
+      const [statusRes, historyRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/attendance/status/${user.empId}`),
+        fetch(`${BASE_URL}/api/attendance/history/${user.empId}`),
+      ]);
+
+      if (!statusRes.ok) throw new Error("Status fetch failed");
+      if (!historyRes.ok) throw new Error("History fetch failed");
+
+      const statusData = await statusRes.json();
+      const historyData = await historyRes.json();
+      const historyEntries = Array.isArray(historyData)
+        ? historyData.map(toHistoryEntry)
+        : [];
+      const now = new Date();
+      const restoredCheckIn = parseAttendanceDateTime(statusData?.date, statusData?.checkIn);
+      const restoredCheckOut = parseAttendanceDateTime(statusData?.date, statusData?.checkOut);
+
+      setHistory(historyEntries);
+      setPeriodSeconds(
+        historyEntries
+          .filter(
+            (entry) =>
+              entry?.date?.getMonth?.() === now.getMonth() &&
+              entry?.date?.getFullYear?.() === now.getFullYear()
+          )
+          .reduce((sum, entry) => sum + (entry.totalSeconds || 0), 0)
+      );
+      setCheckinTime(restoredCheckIn);
+      setCheckoutTime(restoredCheckOut);
+
+      if (statusData?.checkedIn && statusData?.checkedOut) {
+        const completedEntry = historyEntries.find(
+          (entry) => entry?.date?.toDateString?.() === now.toDateString()
+        );
+        setIsClockedIn(false);
+        setIsCheckedOut(true);
+        setTodaySeconds(completedEntry?.totalSeconds || 0);
+      } else if (statusData?.checkedIn) {
+        setIsClockedIn(true);
+        setIsCheckedOut(false);
+        setTodaySeconds(
+          restoredCheckIn
+            ? Math.max(0, Math.floor((Date.now() - restoredCheckIn.getTime()) / 1000))
+            : 0
+        );
+      } else {
+        setIsClockedIn(false);
+        setIsCheckedOut(false);
+        setTodaySeconds(0);
+        setCheckinTime(null);
+        setCheckoutTime(null);
+      }
+    } catch (err) {
+      console.warn("[CheckInScreen] Could not refresh attendance:", err.message);
+    } finally {
+      setStatusLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.empId]);
+
+  useEffect(() => {
+    refreshAttendanceData(true);
+  }, [refreshAttendanceData]);
+
+  useEffect(() => {
+    if (isClockedIn) {
+      timerRef.current = setInterval(() => {
+        setTodaySeconds((s) => s + 1);
+        setPeriodSeconds((s) => s + 1);
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isClockedIn]);
+
+  const handleVerified = async () => {
+    setModalVisible(false);
+    await refreshAttendanceData(false);
+  };
+
+  if (statusLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <OrangeHeader />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#2F6E8E" />
+          <Text style={{ color: "#fff", marginTop: 12, fontSize: 14 }}>
+            Checking attendance status...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <OrangeHeader />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => refreshAttendanceData(false)}
+            tintColor="#2F6E8E"
+          />
+        }
+      >
+        {isCheckedOut ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Today's Attendance</Text>
+            <View style={styles.hoursRow}>
+              <View style={styles.hoursBox}>
+                <Text style={styles.hoursLabel}>Check In</Text>
+                <Text style={styles.hoursValue}>
+                  {checkinTime ? formatTime(checkinTime) : "--:--"}
+                </Text>
+              </View>
+              <View style={{ width: 10 }} />
+              <View style={styles.hoursBox}>
+                <Text style={styles.hoursLabel}>Check Out</Text>
+                <Text style={styles.hoursValue}>
+                  {checkoutTime ? formatTime(checkoutTime) : "--:--"}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.liveBadge,
+                { backgroundColor: "#DCFCE7", borderRadius: 8, padding: 8 },
+              ]}
+            >
+              <View style={[styles.liveDot, { backgroundColor: "#22C55E" }]} />
+              <Text style={[styles.liveTxt, { color: "#16A34A" }]}>
+                Attendance completed for today
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <TotalWorkCard
+            todaySeconds={todaySeconds}
+            periodSeconds={periodSeconds}
+            isClockedIn={isClockedIn}
+            onPress={() => setModalVisible(true)}
+          />
+        )}
+
+        {history.map((entry) => (
+          <HistoryCard key={entry.id} entry={entry} />
+        ))}
+      </ScrollView>
+
+      <VerifyModal
+        visible={modalVisible}
+        isClockedIn={isClockedIn}
+        onSuccess={handleVerified}
+        onCancel={() => setModalVisible(false)}
+      />
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },

@@ -54,7 +54,9 @@
 package com.blisssierra.hrms.service;
 
 import com.blisssierra.hrms.dto.SalaryResponseDto;
+import com.blisssierra.hrms.entity.Employee;
 import com.blisssierra.hrms.entity.Salary;
+import com.blisssierra.hrms.repository.EmployeeRepository;
 import com.blisssierra.hrms.repository.SalaryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +74,9 @@ public class SalaryService {
     @Autowired
     private SalaryRepository salaryRepository;
 
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
     public SalaryResponseDto getCurrentMonthSalary(Long employeeId) {
         LocalDate now = LocalDate.now();
         Optional<Salary> opt = salaryRepository
@@ -82,7 +87,10 @@ public class SalaryService {
             s.setEmployeeId(employeeId);
             s.setMonth(now.getMonthValue());
             s.setYear(now.getYear());
-            s.setGrossSalary(0);
+            double grossSalary = employeeRepository.findById(employeeId)
+                    .map(Employee::getMonthlySalary)
+                    .orElse(0.0);
+            s.setGrossSalary(grossSalary);
             s.setEarnedSalary(0);
             s.setPresentDays(0);
             return s;

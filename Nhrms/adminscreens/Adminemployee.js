@@ -253,13 +253,7 @@ export default function AdminEmployeesScreen({ onBack }) {
           <Text style={styles.backLabel}>Admin</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Employee Management</Text>
-        <View style={styles.headerIcons}>
-          <View style={{ position: "relative" }}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Text style={{ fontSize: 18 }}>🔔</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Tab bar */}
@@ -518,3 +512,4 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: "#2F6E8E", alignItems: "center" },
   saveBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
 });
+

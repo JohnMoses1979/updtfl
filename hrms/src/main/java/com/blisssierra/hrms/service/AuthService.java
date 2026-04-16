@@ -643,6 +643,9 @@ public class AuthService {
     @Autowired
     private PasswordResetTokenStore passwordResetTokenStore;
 
+    @Autowired
+    private AdminNotificationService adminNotificationService;
+
     // ─────────────────────────────────────────────────────────────────────────
     // SIGNUP — Step 1
     // ─────────────────────────────────────────────────────────────────────────
@@ -790,6 +793,7 @@ public class AuthService {
             employee.setVerified(true);
             employeeRepository.save(employee);
             log.info("Employee email verified (pending admin approval): empId={}", employee.getEmpId());
+            adminNotificationService.createSignupRequestNotification(employee);
 
             try {
                 employeeManagementService.syncEmployeeToAppUser(employee);

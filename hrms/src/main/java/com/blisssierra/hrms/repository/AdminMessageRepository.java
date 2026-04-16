@@ -15,6 +15,7 @@ package com.blisssierra.hrms.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -27,6 +28,8 @@ import com.blisssierra.hrms.entity.AdminMessage;
 public interface AdminMessageRepository extends JpaRepository<AdminMessage, Long> {
 
     List<AdminMessage> findByRecipientEmployeeIdOrderByCreatedAtDesc(String recipientEmployeeId);
+    List<AdminMessage> findByRecipientEmployeeIdAndIsReadFalseOrderByCreatedAtDesc(String recipientEmployeeId);
+    Optional<AdminMessage> findById(Long id);
 
     // ISSUE 4 FIX: Find messages newer than a given timestamp
     List<AdminMessage> findByRecipientEmployeeIdAndCreatedAtAfterOrderByCreatedAtDesc(

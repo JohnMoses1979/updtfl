@@ -545,7 +545,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, SafeAreaView,
-  StatusBar, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform,
+  StatusBar, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native';
 import { taskApi } from '../api/taskapi';
 
@@ -751,6 +751,7 @@ export default function Adminperformance({ onMenu, onTabPress, activeTab, onBack
   const [employees, setEmployees] = useState([]);
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [empForm, setEmpForm] = useState(EMPTY_EMP_FORM);
@@ -760,9 +761,10 @@ export default function Adminperformance({ onMenu, onTabPress, activeTab, onBack
   const [tgtForm, setTgtForm] = useState(EMPTY_TGT_FORM);
   const [editTgtId, setEditTgtId] = useState(null);
 
-  const loadPerformanceData = async () => {
+  const loadPerformanceData = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       const allTasks = await fetchAllTasksForPerformance();
       const safeTasks = Array.isArray(allTasks) ? allTasks : [];
 
@@ -774,17 +776,16 @@ export default function Adminperformance({ onMenu, onTabPress, activeTab, onBack
       setTargets([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    loadPerformanceData(true);
   };
 
   useEffect(() => {
     loadPerformanceData();
-
-    const timer = setInterval(() => {
-      loadPerformanceData();
-    }, 5000);
-
-    return () => clearInterval(timer);
   }, []);
 
   const openAddEmp = () => { setEditEmpId(null); setEmpForm(EMPTY_EMP_FORM); setShowEmpModal(true); };
@@ -900,9 +901,11 @@ export default function Adminperformance({ onMenu, onTabPress, activeTab, onBack
           <Text style={s.headerSub}>Goals, KPIs & ratings</Text>
         </View>
 
-        <TouchableOpacity style={s.addHeaderBtn} onPress={tab === 'targets' ? openAddTgt : openAddEmp}>
-          <Text style={{ color: '#FFF', fontSize: 22, lineHeight: 24 }}>+</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={s.addHeaderBtn} onPress={tab === 'targets' ? openAddTgt : openAddEmp}>
+            <Text style={{ color: '#FFF', fontSize: 22, lineHeight: 24 }}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>

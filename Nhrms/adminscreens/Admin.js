@@ -2257,15 +2257,17 @@
  *  3. Admin can approve/reject employees from notification panel
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, SafeAreaView, StatusBar, Modal, KeyboardAvoidingView,
-  Platform, Image, ActivityIndicator, Alert,
+  Platform, Image, ActivityIndicator, Alert, RefreshControl,
 } from "react-native";
+import AdminNotificationModal from "../components/AdminNotificationModal";
 import { notificationApi } from "../api/notificationApi";
 import { messageApi } from "../api/messageApi";
 import { BASE_URL } from "../api/config";
+import { useUser } from "../context/UserContext";
 
 const C = {
   bg: '#112235',
@@ -2309,7 +2311,34 @@ function formatPayroll(amount) {
   return `₹${Math.round(amount)}`;
 }
 
+function isLeaveActiveToday(leave) {
+  if (!leave || leave.status !== "APPROVED" || !leave.startDate || !leave.endDate) {
+    return false;
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const startDate = String(leave.startDate).slice(0, 10);
+  const endDate = String(leave.endDate).slice(0, 10);
+
+  return startDate <= today && today <= endDate;
+}
+
+function getEmployeeDisplayName(employee = {}) {
+  return (
+    employee.employee?.name ||
+    employee.name ||
+    employee.employeeName ||
+    employee.fullName ||
+    [employee.employee?.firstName, employee.employee?.lastName].filter(Boolean).join(" ") ||
+    [employee.firstName, employee.lastName].filter(Boolean).join(" ") ||
+    employee.employee?.empId ||
+    employee.empId ||
+    employee.employeeId ||
+    "Employee"
+  );
+}
 export default function Admin({ onNavigate, profile = {}, onNotificationPress }) {
+  const { user } = useUser();
   const [msgModalVisible, setMsgModalVisible] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -2323,10 +2352,7 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
 
   // ISSUE 2: Notification state
   const [notifModalVisible, setNotifModalVisible] = useState(false);
-  const [pendingEmployees, setPendingEmployees] = useState([]);
-  const [loadingNotifs, setLoadingNotifs] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-  const [processingId, setProcessingId] = useState(null);
 
   // Dashboard state
   const [dashLoading, setDashLoading] = useState(true);
@@ -2337,44 +2363,28 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
     pendingLeave: 0,
     payrollAmount: 0,
     payrollProcessed: false,
+    employeesList: [],
+    presentList: [],
+    leaveList: [],
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const [metricModalVisible, setMetricModalVisible] = useState(false);
+  const [metricModalTitle, setMetricModalTitle] = useState("");
+  const [metricModalItems, setMetricModalItems] = useState([]);
 
   const displayName =
     profile?.name ||
     `${profile?.firstName || ""} ${profile?.lastName || ""}`.trim() ||
+    user?.name ||
     "Admin";
+  const avatarUri = profile?.avatarUri || user?.avatarUri || "";
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  // Poll for pending approvals every 30 seconds
-  useEffect(() => {
-    let mounted = true;
-
-    const loadPendingApprovals = async () => {
-      try {
-        const notifications = await notificationApi.getAdminNotifications().catch(() => []);
-        if (!mounted) return;
-        const list = Array.isArray(notifications) ? notifications : [];
-        setHasUnreadNotifications(list.length > 0);
-        setPendingEmployees(list);
-      } catch (e) {
-        if (!mounted) return;
-        setHasUnreadNotifications(false);
-      }
-    };
-
-    loadPendingApprovals();
-    const interval = setInterval(loadPendingApprovals, 30000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const fetchDashboardData = async () => {
-    setDashLoading(true);
+  const fetchDashboardData = useCallback(async (isPullRefresh = false) => {
+    if (isPullRefresh) {
+      setRefreshing(true);
+    } else {
+      setDashLoading(true);
+    }
     try {
       const [employeesRes, attendanceRes, leaveRes, payrollRes] = await Promise.allSettled([
         fetch(`${BASE_URL}/api/employees`),
@@ -2383,31 +2393,30 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
         fetch(`${BASE_URL}/api/payroll/admin/monthly`),
       ]);
 
-      let totalEmployees = 0;
+      let employeeList = [];
       if (employeesRes.status === "fulfilled" && employeesRes.value.ok) {
         const d = await employeesRes.value.json();
-        totalEmployees = Array.isArray(d) ? d.length : 0;
+        employeeList = Array.isArray(d) ? d : [];
       }
 
-      let presentToday = 0;
+      let presentList = [];
       if (attendanceRes.status === "fulfilled" && attendanceRes.value.ok) {
         const d = await attendanceRes.value.json();
-        presentToday = Array.isArray(d) ? d.length : 0;
+        presentList = Array.isArray(d) ? d : [];
       }
 
-      let onLeave = 0, pendingLeave = 0;
+      let leaveList = [];
+      let pendingLeave = 0;
       if (leaveRes.status === "fulfilled" && leaveRes.value.ok) {
         const d = await leaveRes.value.json();
         if (Array.isArray(d)) {
-          const today = new Date().toISOString().split("T")[0];
-          onLeave = d.filter((l) =>
-            l.startDate <= today && l.endDate >= today && l.status === "APPROVED"
-          ).length;
+          leaveList = d.filter((leave) => isLeaveActiveToday(leave));
           pendingLeave = d.filter((l) => l.status === "REVIEW").length;
         }
       }
 
-      let payrollAmount = 0, payrollProcessed = false;
+      let payrollAmount = 0;
+      let payrollProcessed = false;
       if (payrollRes.status === "fulfilled" && payrollRes.value.ok) {
         const d = await payrollRes.value.json();
         if (Array.isArray(d) && d.length > 0) {
@@ -2416,79 +2425,80 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
         }
       }
 
-      setDashData({ totalEmployees, presentToday, onLeave, pendingLeave, payrollAmount, payrollProcessed });
+      setDashData({
+        totalEmployees: employeeList.length,
+        presentToday: presentList.length,
+        onLeave: leaveList.length,
+        pendingLeave,
+        payrollAmount,
+        payrollProcessed,
+        employeesList: employeeList.map((employee) => ({
+          id: employee.id || employee.employeeId || employee.empId,
+          title: getEmployeeDisplayName(employee),
+          subtitle: employee.empId || employee.employeeId || employee.designation || "Registered employee",
+        })),
+        presentList: presentList.map((employee) => ({
+          id: employee.id || employee.empId,
+          title: getEmployeeDisplayName(employee),
+          subtitle: [employee.empId, employee.checkIn, employee.checkOut].filter(Boolean).join("  •  "),
+        })),
+        leaveList: leaveList.map((leave) => ({
+          id: leave.id || leave.employeeId,
+          title: getEmployeeDisplayName(leave),
+          subtitle: [leave.leaveType, leave.startDate, leave.endDate].filter(Boolean).join("  •  "),
+        })),
+      });
     } catch (e) {
       console.log("DASHBOARD FETCH ERROR:", e.message);
     } finally {
       setDashLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Poll for admin notifications every 30 seconds
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAdminNotifications = async () => {
+      try {
+        const notifications = await notificationApi.getAdminNotifications().catch(() => []);
+        if (!mounted) return;
+        const activeList = Array.isArray(notifications) ? notifications : [];
+        setHasUnreadNotifications(activeList.length > 0);
+      } catch (e) {
+        if (!mounted) return;
+        setHasUnreadNotifications(false);
+      }
+    };
+
+    loadAdminNotifications();
+    const interval = setInterval(loadAdminNotifications, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const attendancePercent =
     dashData.totalEmployees > 0
       ? Math.round((dashData.presentToday / dashData.totalEmployees) * 100)
       : 0;
 
-  // ISSUE 2 FIX: Open notification panel
-  const handleNotifPress = async () => {
-    setLoadingNotifs(true);
+  const handleNotifPress = () => {
     setNotifModalVisible(true);
-    try {
-      const list = await notificationApi.getAdminNotifications().catch(() => []);
-      setPendingEmployees(Array.isArray(list) ? list : []);
-    } catch (e) {
-      setPendingEmployees([]);
-    } finally {
-      setLoadingNotifs(false);
-    }
   };
 
-  // ISSUE 2 FIX: Approve employee
-  const handleApprove = async (notification) => {
-    setProcessingId(notification.employeeId);
-    try {
-      await notificationApi.approveEmployee(notification.employeeId);
-      setPendingEmployees((prev) => prev.filter((n) => n.employeeId !== notification.employeeId));
-      Alert.alert("✅ Approved", `${notification.employeeName} has been approved and can now log in.`);
-      if (pendingEmployees.length <= 1) {
-        setHasUnreadNotifications(false);
-      }
-    } catch (e) {
-      Alert.alert("Error", e.message || "Failed to approve employee");
-    } finally {
-      setProcessingId(null);
-    }
+  const openMetricModal = (title, items = []) => {
+    setMetricModalTitle(title);
+    setMetricModalItems(items);
+    setMetricModalVisible(true);
   };
 
-  // ISSUE 2 FIX: Reject employee
-  const handleReject = async (notification) => {
-    Alert.alert(
-      "Reject Employee",
-      `Are you sure you want to reject ${notification.employeeName}? This will delete their account.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reject",
-          style: "destructive",
-          onPress: async () => {
-            setProcessingId(notification.employeeId);
-            try {
-              await notificationApi.rejectEmployee(notification.employeeId);
-              setPendingEmployees((prev) =>
-                prev.filter((n) => n.employeeId !== notification.employeeId)
-              );
-              Alert.alert("❌ Rejected", `${notification.employeeName}'s request has been rejected.`);
-              if (pendingEmployees.length <= 1) setHasUnreadNotifications(false);
-            } catch (e) {
-              Alert.alert("Error", e.message || "Failed to reject employee");
-            } finally {
-              setProcessingId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const closeModal = () => {
     setMsgModalVisible(false);
@@ -2568,7 +2578,17 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-      <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.root}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchDashboardData(true)}
+            tintColor="#2F6E8E"
+          />
+        }
+      >
 
         {/* Top Bar */}
         <View style={styles.topBar}>
@@ -2578,8 +2598,8 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
             onPress={() => onNavigate && onNavigate("profile")}
           >
             <View style={styles.avatar}>
-              {profile?.avatarUri ? (
-                <Image source={{ uri: profile.avatarUri }} style={styles.avatarImage} />
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarEmoji}>{getInitials(displayName)}</Text>
               )}
@@ -2621,21 +2641,33 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
             </View>
           ) : (
             <View style={styles.metricsRow}>
-              <View style={styles.metricBox}>
+              <View
+                style={styles.metricBox}
+                onStartShouldSetResponder={() => true}
+                onResponderRelease={() => openMetricModal("Total Employees", dashData.employeesList || [])}
+              >
                 <Text style={styles.metricBoxLabel}>Total{"\n"}Employees</Text>
                 <Text style={styles.metricBoxVal}>{dashData.totalEmployees}</Text>
                 <View style={styles.badgeBlue}>
                   <Text style={styles.badgeBlueText}>Registered</Text>
                 </View>
               </View>
-              <View style={styles.metricBox}>
+              <View
+                style={styles.metricBox}
+                onStartShouldSetResponder={() => true}
+                onResponderRelease={() => openMetricModal("Present Today", dashData.presentList || [])}
+              >
                 <Text style={styles.metricBoxLabel}>Present Today</Text>
                 <Text style={styles.metricBoxVal}>{dashData.presentToday}</Text>
                 <View style={styles.badgeBlue}>
                   <Text style={styles.badgeBlueText}>{attendancePercent}% attendance</Text>
                 </View>
               </View>
-              <View style={styles.metricBox}>
+              <View
+                style={styles.metricBox}
+                onStartShouldSetResponder={() => true}
+                onResponderRelease={() => openMetricModal("Employees On Leave Today", dashData.leaveList || [])}
+              >
                 <Text style={styles.metricBoxLabel}>On Leave</Text>
                 <Text style={styles.metricBoxVal}>{dashData.onLeave}</Text>
                 <View style={styles.badgeOrange}>
@@ -2666,7 +2698,9 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
               activeOpacity={0.8}
               onPress={() => onNavigate && onNavigate(tile.key)}
             >
-              <Text style={styles.tileEmoji}>{tile.emoji}</Text>
+              <View style={styles.tileEmojiWrap}>
+                <Text style={styles.tileEmoji}>{tile.emoji}</Text>
+              </View>
               <Text style={[styles.tileLabel, { color: tile.accent }]}>{tile.label}</Text>
             </TouchableOpacity>
           ))}
@@ -2682,104 +2716,52 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
 
         <View style={{ height: 32 }} />
       </ScrollView>
-
-      {/* ── ISSUE 2 FIX: Notification / Approval Modal ── */}
-      <Modal
+      <AdminNotificationModal
         visible={notifModalVisible}
+        onClose={() => setNotifModalVisible(false)}
+        onNavigate={onNavigate}
+      />
+
+      <Modal
+        visible={metricModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setNotifModalVisible(false)}
+        onRequestClose={() => setMetricModalVisible(false)}
       >
-        <View style={notifStyles.overlay}>
+        <View style={styles.metricModalOverlay}>
           <TouchableOpacity
-            style={notifStyles.backdrop}
+            style={styles.modalBackdrop}
             activeOpacity={1}
-            onPress={() => setNotifModalVisible(false)}
+            onPress={() => setMetricModalVisible(false)}
           />
-          <View style={notifStyles.sheet}>
-            <View style={notifStyles.handle} />
-            <View style={notifStyles.header}>
-              <Text style={notifStyles.title}>
-                🔔 Notifications
-                {pendingEmployees.length > 0 && (
-                  <Text style={notifStyles.badge}> ({pendingEmployees.length})</Text>
-                )}
-              </Text>
-              <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
-                <Text style={{ color: C.muted, fontSize: 22 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loadingNotifs ? (
-              <View style={notifStyles.centered}>
-                <ActivityIndicator color="#2F6E8E" size="large" />
-                <Text style={notifStyles.loadingText}>Loading notifications...</Text>
-              </View>
-            ) : pendingEmployees.length === 0 ? (
-              <View style={notifStyles.centered}>
-                <Text style={{ fontSize: 40, marginBottom: 12 }}>✅</Text>
-                <Text style={notifStyles.emptyText}>No pending approvals</Text>
-                <Text style={notifStyles.emptySubText}>All employee requests have been handled.</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {pendingEmployees.map((notif) => (
-                  <View key={notif.employeeId} style={notifStyles.card}>
-                    <View style={notifStyles.cardHeader}>
-                      <View style={notifStyles.avatarCircle}>
-                        <Text style={notifStyles.avatarText}>
-                          {(notif.employeeName || "?").charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={notifStyles.empName}>{notif.employeeName}</Text>
-                        <Text style={notifStyles.empId}>{notif.employeeEmpId}</Text>
-                      </View>
-                      <View style={notifStyles.pendingBadge}>
-                        <Text style={notifStyles.pendingBadgeText}>Pending</Text>
-                      </View>
-                    </View>
-
-                    <View style={notifStyles.infoRow}>
-                      <Text style={notifStyles.infoLabel}>Email</Text>
-                      <Text style={notifStyles.infoValue}>{notif.employeeEmail}</Text>
-                    </View>
-                    <View style={notifStyles.infoRow}>
-                      <Text style={notifStyles.infoLabel}>Designation</Text>
-                      <Text style={notifStyles.infoValue}>{notif.designation}</Text>
-                    </View>
-
-                    <View style={notifStyles.actionRow}>
-                      <TouchableOpacity
-                        style={[
-                          notifStyles.approveBtn,
-                          processingId === notif.employeeId && { opacity: 0.6 },
-                        ]}
-                        onPress={() => handleApprove(notif)}
-                        disabled={processingId === notif.employeeId}
-                      >
-                        {processingId === notif.employeeId ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={notifStyles.approveBtnText}>✓ Approve</Text>
-                        )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          notifStyles.rejectBtn,
-                          processingId === notif.employeeId && { opacity: 0.6 },
-                        ]}
-                        onPress={() => handleReject(notif)}
-                        disabled={processingId === notif.employeeId}
-                      >
-                        <Text style={notifStyles.rejectBtnText}>✕ Reject</Text>
-                      </TouchableOpacity>
-                    </View>
+          <View style={styles.metricModalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{metricModalTitle}</Text>
+            <Text style={styles.sheetSubtitle}>
+              {metricModalItems.length > 0
+                ? `${metricModalItems.length} employee${metricModalItems.length > 1 ? "s" : ""}`
+                : "No employees to show for today"}
+            </Text>
+            <ScrollView style={styles.metricModalList} showsVerticalScrollIndicator={false}>
+              {metricModalItems.length === 0 ? (
+                <View style={styles.metricEmptyWrap}>
+                  <Text style={styles.metricEmptyText}>No records available.</Text>
+                </View>
+              ) : (
+                metricModalItems.map((item) => (
+                  <View key={item.id} style={styles.metricListItem}>
+                    <Text style={styles.metricListTitle}>{item.title}</Text>
+                    <Text style={styles.metricListSub}>{item.subtitle}</Text>
                   </View>
-                ))}
-              </ScrollView>
-            )}
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setMetricModalVisible(false)}
+            >
+              <Text style={styles.cancelBtnText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -3106,10 +3088,7 @@ const styles = StyleSheet.create({
   },
   dashCardTitle: { fontSize: 18, fontWeight: "800", color: C.text },
   dashCardSub: { fontSize: 12, color: C.muted, marginTop: 2 },
-  refreshBtn: {
-    backgroundColor: "#1a3a5c", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6,
-  },
+  refreshBtn: { display: "none" },
   refreshBtnText: { fontSize: 16 },
   dashLoadingWrap: {
     flexDirection: "row", alignItems: "center",
@@ -3133,7 +3112,13 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
   },
-  tileEmoji: { fontSize: 36 },
+  tileEmojiWrap: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tileEmoji: { fontSize: 30, lineHeight: 30, textAlign: "center" },
   tileLabel: { fontSize: 12, fontWeight: "700", textAlign: "center", letterSpacing: 0.3 },
   msgBtn: {
     marginHorizontal: 16, marginTop: 20, backgroundColor: "#2F6E8E",
@@ -3144,6 +3129,28 @@ const styles = StyleSheet.create({
   msgBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700", letterSpacing: 0.3 },
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
+  metricModalOverlay: { flex: 1, justifyContent: "flex-end" },
+  metricModalSheet: {
+    backgroundColor: "#0f1e30",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 28,
+    maxHeight: "75%",
+  },
+  metricModalList: { marginTop: 8, marginBottom: 16 },
+  metricListItem: {
+    backgroundColor: "#112235",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#1a3a5c",
+    padding: 12,
+    marginBottom: 10,
+  },
+  metricListTitle: { color: "#F0EDE8", fontSize: 14, fontWeight: "700" },
+  metricListSub: { color: "#7A7570", fontSize: 12, marginTop: 4 },
+  metricEmptyWrap: { paddingVertical: 30, alignItems: "center" },
+  metricEmptyText: { color: "#7A7570", fontSize: 13 },
   modalSheet: {
     backgroundColor: "#0f1e30", borderTopLeftRadius: 24,
     borderTopRightRadius: 24, padding: 24, paddingBottom: 36,
@@ -3215,3 +3222,13 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
 });
+
+
+
+
+
+
+
+
+
+

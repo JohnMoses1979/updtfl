@@ -140,4 +140,12 @@ export const messageApi = {
    */
   getUserMessages: (employeeId) =>
     request(`/messages/employee/${encodeURIComponent(employeeId)}`),
+
+  getUserNotifications: (employeeId) =>
+    request(`/messages/employee/${encodeURIComponent(employeeId)}/notifications`),
+
+  markAsRead: (messageId) =>
+    request(`/messages/${messageId}/read`, {
+      method: "PUT",
+    }),
 };

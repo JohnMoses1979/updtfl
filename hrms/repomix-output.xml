@@ -88,6 +88,7 @@ src/main/java/com/blisssierra/hrms/dto/TaskUserUpdateRequest.java
 src/main/java/com/blisssierra/hrms/dto/UserOptionDto.java
 src/main/java/com/blisssierra/hrms/dto/VerifyForgotOtpRequestDto.java
 src/main/java/com/blisssierra/hrms/entity/AdminMessage.java
+src/main/java/com/blisssierra/hrms/entity/AdminNotification.java
 src/main/java/com/blisssierra/hrms/entity/AppUser.java
 src/main/java/com/blisssierra/hrms/entity/Attendance.java
 src/main/java/com/blisssierra/hrms/entity/Employee.java
@@ -98,6 +99,7 @@ src/main/java/com/blisssierra/hrms/entity/Task.java
 src/main/java/com/blisssierra/hrms/exception/GlobalExceptionHandler.java
 src/main/java/com/blisssierra/hrms/HrmsApplication.java
 src/main/java/com/blisssierra/hrms/repository/AdminMessageRepository.java
+src/main/java/com/blisssierra/hrms/repository/AdminNotificationRepository.java
 src/main/java/com/blisssierra/hrms/repository/AppManagementRepository.java
 src/main/java/com/blisssierra/hrms/repository/AppUserRepository.java
 src/main/java/com/blisssierra/hrms/repository/AttendanceRepository.java
@@ -106,6 +108,7 @@ src/main/java/com/blisssierra/hrms/repository/LeaveRepository.java
 src/main/java/com/blisssierra/hrms/repository/OtpRepository.java
 src/main/java/com/blisssierra/hrms/repository/SalaryRepository.java
 src/main/java/com/blisssierra/hrms/repository/TaskRepository.java
+src/main/java/com/blisssierra/hrms/service/AdminNotificationService.java
 src/main/java/com/blisssierra/hrms/service/AppManagementService.java
 src/main/java/com/blisssierra/hrms/service/AttendanceApiService.java
 src/main/java/com/blisssierra/hrms/service/AttendanceService.java
@@ -138,6 +141,9 @@ uploads/faces/BSSE017/face_3.jpg
 uploads/faces/BSSE022/face_1.jpg
 uploads/faces/BSSE022/face_2.jpg
 uploads/faces/BSSE022/face_3.jpg
+uploads/faces/BSSE023/face_1.jpg
+uploads/faces/BSSE023/face_2.jpg
+uploads/faces/BSSE023/face_3.jpg
 uploads/faces/BSSE025/face_1.jpg
 uploads/faces/BSSE025/face_2.jpg
 uploads/faces/BSSE025/face_3.jpg
@@ -780,7 +786,7 @@ Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<optional>true</optional>
+			<scope>provided</scope>
 		</dependency>
 
 		<!-- Spring Boot Test -->
@@ -793,6 +799,18 @@ Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
@@ -1475,7 +1493,6 @@ package com.blisssierra.hrms.controller;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1497,6 +1514,7 @@ import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.ProfileUpdateRequest;
 import com.blisssierra.hrms.entity.Employee;
 import com.blisssierra.hrms.repository.EmployeeRepository;
+import com.blisssierra.hrms.service.AdminNotificationService;
 import com.blisssierra.hrms.service.EmployeeManagementService;
 
 import jakarta.validation.Valid;
@@ -1512,6 +1530,9 @@ public class EmployeeController {
 
     @Autowired
     private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AdminNotificationService adminNotificationService;
 
     // GET /api/employees
     @GetMapping
@@ -1597,6 +1618,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new RuntimeException("Employee not found: id=" + id));
         emp.setApproved(true);
         employeeRepository.save(emp);
+        adminNotificationService.createApprovalActionNotification(emp, true);
         log.info("✅ Employee approved: empId={}", emp.getEmpId());
         return ResponseEntity.ok(Map.of(
                 "status", "success",
@@ -1616,6 +1638,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new RuntimeException("Employee not found: id=" + id));
         String empId = emp.getEmpId();
         String name = emp.getName();
+        adminNotificationService.createApprovalActionNotification(emp, false);
         employeeRepository.delete(emp);
         log.info("❌ Employee rejected and deleted: empId={}", empId);
         return ResponseEntity.ok(Map.of(
@@ -1631,26 +1654,7 @@ public class EmployeeController {
     @GetMapping("/pending-approval")
     public ResponseEntity<List<NotificationDto>> getPendingApproval() {
         log.info("GET /api/employees/pending-approval");
-        List<Employee> pending = employeeRepository.findAll().stream()
-                .filter(e -> e.isVerified() && !e.isApproved())
-                .collect(Collectors.toList());
-
-        List<NotificationDto> notifications = pending.stream()
-                .map(e -> new NotificationDto(
-                        e.getId(),
-                        "SIGNUP_REQUEST",
-                        "New Employee Signup",
-                        e.getName() + " (" + e.getEmpId() + ") has signed up and is awaiting approval.",
-                        false,
-                        e.getCreatedAt(),
-                        e.getId(),
-                        e.getName(),
-                        e.getEmpId(),
-                        e.getEmail(),
-                        e.getDesignation()))
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(notifications);
+        return ResponseEntity.ok(adminNotificationService.getActiveSignupNotifications());
     }
 
     /**
@@ -1660,27 +1664,23 @@ public class EmployeeController {
     @GetMapping("/admin-notifications")
     public ResponseEntity<List<NotificationDto>> getAdminNotifications() {
         log.info("GET /api/employees/admin-notifications");
-        List<Employee> pending = employeeRepository.findAll().stream()
-                .filter(e -> e.isVerified() && !e.isApproved())
-                .collect(Collectors.toList());
+        return ResponseEntity.ok(adminNotificationService.getActiveNotifications());
+    }
 
-        List<NotificationDto> notifications = pending.stream()
-                .map(e -> new NotificationDto(
-                        e.getId(),
-                        "SIGNUP_REQUEST",
-                        "New Employee Signup Request",
-                        e.getName() + " (" + e.getEmpId() + ") | " + e.getDesignation()
-                                + " — awaiting approval",
-                        false,
-                        e.getCreatedAt(),
-                        e.getId(),
-                        e.getName(),
-                        e.getEmpId(),
-                        e.getEmail(),
-                        e.getDesignation()))
-                .collect(Collectors.toList());
+    @GetMapping("/admin-notifications/history")
+    public ResponseEntity<List<NotificationDto>> getAdminNotificationHistory() {
+        log.info("GET /api/employees/admin-notifications/history");
+        return ResponseEntity.ok(adminNotificationService.getHistoryNotifications());
+    }
 
-        return ResponseEntity.ok(notifications);
+    @PutMapping("/admin-notifications/{notificationId}/read")
+    public ResponseEntity<?> markAdminNotificationAsRead(@PathVariable Long notificationId) {
+        log.info("PUT /api/employees/admin-notifications/{}/read", notificationId);
+        adminNotificationService.markAsRead(notificationId);
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Notification marked as read",
+                "notificationId", notificationId));
     }
 }
 </file>
@@ -1782,6 +1782,17 @@ public class MessageController {
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<MessageResponseDto>> getMessagesForEmployee(@PathVariable String employeeId) {
         return ResponseEntity.ok(messageService.getMessagesForEmployee(employeeId));
+    }
+
+    @GetMapping("/employee/{employeeId}/notifications")
+    public ResponseEntity<List<MessageResponseDto>> getUnreadMessagesForEmployee(@PathVariable String employeeId) {
+        return ResponseEntity.ok(messageService.getUnreadMessagesForEmployee(employeeId));
+    }
+
+    @PutMapping("/{messageId}/read")
+    public ResponseEntity<MessageResponseDto> markMessageAsRead(@PathVariable Long messageId) {
+        messageService.markMessageAsRead(messageId);
+        return ResponseEntity.ok(new MessageResponseDto());
     }
 }
 </file>
@@ -2972,6 +2983,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import com.blisssierra.hrms.dto.ApiResponse;
+import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.TaskAdminRequest;
 import com.blisssierra.hrms.dto.TaskUserUpdateRequest;
 import com.blisssierra.hrms.dto.UserOptionDto;
@@ -3006,6 +3018,18 @@ public class TaskController {
     public ApiResponse<List<Task>> getAllTasks() {
         return new ApiResponse<>(true, "Tasks fetched successfully",
                 taskService.getAllTasks());
+    }
+
+    @GetMapping("/api/tasks/admin/notifications")
+    public ApiResponse<List<NotificationDto>> getAdminTaskNotifications() {
+        return new ApiResponse<>(true, "Admin task notifications fetched successfully",
+                taskService.getAdminTaskNotifications());
+    }
+
+    @PutMapping("/api/tasks/admin/notifications/{taskId}/read")
+    public ApiResponse<Void> markAdminTaskNotificationAsRead(@PathVariable Long taskId) {
+        taskService.markAdminTaskNotificationAsRead(taskId);
+        return new ApiResponse<>(true, "Admin task notification marked as read", null);
     }
 
     @PostMapping("/api/tasks/admin")
@@ -3043,12 +3067,24 @@ public class TaskController {
                 taskService.getTasksByEmployeeId(employeeId));
     }
 
+    @GetMapping("/api/tasks/user/{employeeId}/notifications")
+    public ApiResponse<List<NotificationDto>> getUserTaskNotifications(@PathVariable String employeeId) {
+        return new ApiResponse<>(true, "User task notifications fetched successfully",
+                taskService.getUserTaskNotifications(employeeId));
+    }
+
     @PutMapping("/api/tasks/user/{taskId}")
     public ApiResponse<Task> updateTaskByUser(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskUserUpdateRequest request) {
         return new ApiResponse<>(true, "Task updated by user successfully",
                 taskService.updateTaskByUser(taskId, request));
+    }
+
+    @PutMapping("/api/tasks/user/{taskId}/notification-read")
+    public ApiResponse<Void> markUserTaskNotificationAsRead(@PathVariable Long taskId) {
+        taskService.markUserTaskNotificationAsRead(taskId);
+        return new ApiResponse<>(true, "User task notification marked as read", null);
     }
 
     // ── Employee lookup endpoints (used by admin task assignment dropdown) ────
@@ -3716,7 +3752,6 @@ package com.blisssierra.hrms.dto;
 
 import java.time.LocalDateTime;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -3725,7 +3760,6 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class NotificationDto {
     private Long id;
     private String type; // "SIGNUP_REQUEST", "SYSTEM", "MESSAGE"
@@ -3740,6 +3774,77 @@ public class NotificationDto {
     private String employeeEmpId;
     private String employeeEmail;
     private String designation;
+
+    // For task/message click-through notifications
+    private Long taskId;
+    private String targetPage;
+    private Long leaveId;
+    private boolean active;
+
+    public NotificationDto(
+            Long id,
+            String type,
+            String title,
+            String body,
+            boolean isRead,
+            LocalDateTime createdAt,
+            Long employeeId,
+            String employeeName,
+            String employeeEmpId,
+            String employeeEmail,
+            String designation,
+            Long taskId,
+            String targetPage) {
+        this(
+                id,
+                type,
+                title,
+                body,
+                isRead,
+                createdAt,
+                employeeId,
+                employeeName,
+                employeeEmpId,
+                employeeEmail,
+                designation,
+                taskId,
+                targetPage,
+                null,
+                false);
+    }
+
+    public NotificationDto(
+            Long id,
+            String type,
+            String title,
+            String body,
+            boolean isRead,
+            LocalDateTime createdAt,
+            Long employeeId,
+            String employeeName,
+            String employeeEmpId,
+            String employeeEmail,
+            String designation,
+            Long taskId,
+            String targetPage,
+            Long leaveId,
+            boolean active) {
+        this.id = id;
+        this.type = type;
+        this.title = title;
+        this.body = body;
+        this.isRead = isRead;
+        this.createdAt = createdAt;
+        this.employeeId = employeeId;
+        this.employeeName = employeeName;
+        this.employeeEmpId = employeeEmpId;
+        this.employeeEmail = employeeEmail;
+        this.designation = designation;
+        this.taskId = taskId;
+        this.targetPage = targetPage;
+        this.leaveId = leaveId;
+        this.active = active;
+    }
 }
 </file>
 
@@ -4150,6 +4255,99 @@ public class AdminMessage {
         if (isBroadcast == null) {
             isBroadcast = false;
         }
+    }
+}
+</file>
+
+<file path="src/main/java/com/blisssierra/hrms/entity/AdminNotification.java">
+package com.blisssierra.hrms.entity;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name = "admin_notifications")
+@Getter
+@Setter
+public class AdminNotification {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 50)
+    private String type;
+
+    @Column(nullable = false, length = 200)
+    private String title;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String body;
+
+    @Column(name = "is_read", nullable = false)
+    private Boolean read = false;
+
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    @Column(name = "employee_id")
+    private Long employeeId;
+
+    @Column(name = "employee_name", length = 120)
+    private String employeeName;
+
+    @Column(name = "employee_emp_id", length = 50)
+    private String employeeEmpId;
+
+    @Column(name = "employee_email", length = 150)
+    private String employeeEmail;
+
+    @Column(length = 120)
+    private String designation;
+
+    @Column(name = "task_id")
+    private Long taskId;
+
+    @Column(name = "leave_id")
+    private Long leaveId;
+
+    @Column(name = "target_page", length = 50)
+    private String targetPage;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+        if (read == null) {
+            read = false;
+        }
+        if (active == null) {
+            active = true;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }
 </file>
@@ -4659,6 +4857,12 @@ public class Task {
     @Column(name = "comments_count", nullable = false)
     private Integer commentsCount = 0;
 
+    @Column(name = "admin_update_pending_for_user", nullable = false)
+    private Boolean adminUpdatePendingForUser = true;
+
+    @Column(name = "user_update_pending_for_admin", nullable = false)
+    private Boolean userUpdatePendingForAdmin = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -4786,6 +4990,7 @@ package com.blisssierra.hrms.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -4798,6 +5003,8 @@ import com.blisssierra.hrms.entity.AdminMessage;
 public interface AdminMessageRepository extends JpaRepository<AdminMessage, Long> {
 
     List<AdminMessage> findByRecipientEmployeeIdOrderByCreatedAtDesc(String recipientEmployeeId);
+    List<AdminMessage> findByRecipientEmployeeIdAndIsReadFalseOrderByCreatedAtDesc(String recipientEmployeeId);
+    Optional<AdminMessage> findById(Long id);
 
     // ISSUE 4 FIX: Find messages newer than a given timestamp
     List<AdminMessage> findByRecipientEmployeeIdAndCreatedAtAfterOrderByCreatedAtDesc(
@@ -4808,6 +5015,29 @@ public interface AdminMessageRepository extends JpaRepository<AdminMessage, Long
     @Transactional
     @Query("DELETE FROM AdminMessage m WHERE m.createdAt < :cutoff")
     void deleteByCreatedAtBefore(@Param("cutoff") LocalDateTime cutoff);
+}
+</file>
+
+<file path="src/main/java/com/blisssierra/hrms/repository/AdminNotificationRepository.java">
+package com.blisssierra.hrms.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.blisssierra.hrms.entity.AdminNotification;
+
+public interface AdminNotificationRepository extends JpaRepository<AdminNotification, Long> {
+
+    List<AdminNotification> findByActiveTrueOrderByCreatedAtDesc();
+
+    List<AdminNotification> findByActiveFalseOrderByCreatedAtDesc();
+
+    List<AdminNotification> findByTypeAndActiveTrueOrderByCreatedAtDesc(String type);
+
+    List<AdminNotification> findByTypeAndEmployeeIdAndActiveTrueOrderByCreatedAtDesc(String type, Long employeeId);
+
+    List<AdminNotification> findByTypeAndLeaveIdAndActiveTrueOrderByCreatedAtDesc(String type, Long leaveId);
 }
 </file>
 
@@ -5031,6 +5261,234 @@ import com.blisssierra.hrms.entity.Task;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findAllByOrderByUpdatedAtDesc();
     List<Task> findByAssigneeEmployeeIdIgnoreCaseOrderByUpdatedAtDesc(String assigneeEmployeeId);
+    List<Task> findByAssigneeEmployeeIdIgnoreCaseAndAdminUpdatePendingForUserTrueOrderByUpdatedAtDesc(String assigneeEmployeeId);
+    List<Task> findByUserUpdatePendingForAdminTrueOrderByUpdatedAtDesc();
+}
+</file>
+
+<file path="src/main/java/com/blisssierra/hrms/service/AdminNotificationService.java">
+package com.blisssierra.hrms.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.blisssierra.hrms.dto.NotificationDto;
+import com.blisssierra.hrms.entity.AdminNotification;
+import com.blisssierra.hrms.entity.Employee;
+import com.blisssierra.hrms.entity.Leave;
+import com.blisssierra.hrms.entity.Task;
+import com.blisssierra.hrms.repository.AdminNotificationRepository;
+
+@Service
+public class AdminNotificationService {
+
+    public static final String TYPE_SIGNUP_REQUEST = "SIGNUP_REQUEST";
+    public static final String TYPE_APPROVAL_ACTION = "APPROVAL_ACTION";
+    public static final String TYPE_LEAVE_REQUEST = "LEAVE_REQUEST";
+    public static final String TYPE_LEAVE_ACTION = "LEAVE_ACTION";
+    public static final String TYPE_TASK_UPDATED = "TASK_UPDATED";
+
+    private final AdminNotificationRepository adminNotificationRepository;
+
+    public AdminNotificationService(AdminNotificationRepository adminNotificationRepository) {
+        this.adminNotificationRepository = adminNotificationRepository;
+    }
+
+    public List<NotificationDto> getActiveNotifications() {
+        return adminNotificationRepository.findByActiveTrueOrderByCreatedAtDesc()
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    public List<NotificationDto> getHistoryNotifications() {
+        return adminNotificationRepository.findByActiveFalseOrderByCreatedAtDesc()
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Transactional
+    public void markAsRead(Long notificationId) {
+        AdminNotification notification = adminNotificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found: " + notificationId));
+        notification.setRead(true);
+        notification.setActive(false);
+        adminNotificationRepository.save(notification);
+    }
+
+    public NotificationDto createSignupRequestNotification(Employee employee) {
+        return toDto(saveNotification(
+                TYPE_SIGNUP_REQUEST,
+                "Employee Approval Request",
+                String.format("%s (%s) is awaiting admin approval.",
+                        employee.getName(),
+                        employee.getEmpId()),
+                true,
+                employee,
+                null,
+                null,
+                "employees"));
+    }
+
+    @Transactional
+    public void createApprovalActionNotification(Employee employee, boolean approved) {
+        deactivateActiveSignupRequests(employee.getId());
+        saveNotification(
+                TYPE_APPROVAL_ACTION,
+                approved ? "Employee Approved" : "Employee Rejected",
+                String.format("%s (%s) was %s by admin.",
+                        employee.getName(),
+                        employee.getEmpId(),
+                        approved ? "approved" : "rejected"),
+                false,
+                employee,
+                null,
+                null,
+                "employees");
+    }
+
+    public NotificationDto createLeaveRequestNotification(Leave leave) {
+        Employee employee = leave.getEmployee();
+        return toDto(saveNotification(
+                TYPE_LEAVE_REQUEST,
+                "Leave Request",
+                String.format("%s (%s) requested leave from %s to %s.",
+                        employee.getName(),
+                        employee.getEmpId(),
+                        leave.getStartDate(),
+                        leave.getEndDate()),
+                true,
+                employee,
+                null,
+                leave,
+                "leave"));
+    }
+
+    @Transactional
+    public void createLeaveActionNotification(Leave leave) {
+        deactivateActiveLeaveRequests(leave.getId());
+        Employee employee = leave.getEmployee();
+        saveNotification(
+                TYPE_LEAVE_ACTION,
+                "Leave Action",
+                String.format("%s (%s) leave was %s for %s to %s.",
+                        employee.getName(),
+                        employee.getEmpId(),
+                        leave.getStatus(),
+                        leave.getStartDate(),
+                        leave.getEndDate()),
+                false,
+                employee,
+                null,
+                leave,
+                "leave");
+    }
+
+    public NotificationDto createTaskUpdatedNotification(Task task, String body) {
+        Employee employee = new Employee();
+        employee.setId(task.getAssigneeId());
+        employee.setName(task.getAssigneeName());
+        employee.setEmpId(task.getAssigneeEmployeeId());
+        return toDto(saveNotification(
+                TYPE_TASK_UPDATED,
+                "Task Update",
+                body,
+                true,
+                employee,
+                task,
+                null,
+                "tasks"));
+    }
+
+    @Transactional
+    public void deactivateActiveSignupRequests(Long employeeId) {
+        adminNotificationRepository
+                .findByTypeAndEmployeeIdAndActiveTrueOrderByCreatedAtDesc(TYPE_SIGNUP_REQUEST, employeeId)
+                .forEach(notification -> {
+                    notification.setActive(false);
+                    notification.setRead(true);
+                    adminNotificationRepository.save(notification);
+                });
+    }
+
+    @Transactional
+    public void deactivateActiveLeaveRequests(Long leaveId) {
+        adminNotificationRepository
+                .findByTypeAndLeaveIdAndActiveTrueOrderByCreatedAtDesc(TYPE_LEAVE_REQUEST, leaveId)
+                .forEach(notification -> {
+                    notification.setActive(false);
+                    notification.setRead(true);
+                    adminNotificationRepository.save(notification);
+                });
+    }
+
+    public List<NotificationDto> getActiveSignupNotifications() {
+        return adminNotificationRepository.findByTypeAndActiveTrueOrderByCreatedAtDesc(TYPE_SIGNUP_REQUEST)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    private AdminNotification saveNotification(
+            String type,
+            String title,
+            String body,
+            boolean active,
+            Employee employee,
+            Task task,
+            Leave leave,
+            String targetPage) {
+        AdminNotification notification = new AdminNotification();
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setBody(body);
+        notification.setActive(active);
+        notification.setRead(!active);
+        notification.setTargetPage(targetPage);
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setUpdatedAt(LocalDateTime.now());
+
+        if (employee != null) {
+            notification.setEmployeeId(employee.getId());
+            notification.setEmployeeName(employee.getName());
+            notification.setEmployeeEmpId(employee.getEmpId());
+            notification.setEmployeeEmail(employee.getEmail());
+            notification.setDesignation(employee.getDesignation());
+        }
+
+        if (task != null) {
+            notification.setTaskId(task.getId());
+        }
+
+        if (leave != null) {
+            notification.setLeaveId(leave.getId());
+        }
+
+        return adminNotificationRepository.save(notification);
+    }
+
+    private NotificationDto toDto(AdminNotification notification) {
+        return new NotificationDto(
+                notification.getId(),
+                notification.getType(),
+                notification.getTitle(),
+                notification.getBody(),
+                Boolean.TRUE.equals(notification.getRead()),
+                notification.getCreatedAt(),
+                notification.getEmployeeId(),
+                notification.getEmployeeName(),
+                notification.getEmployeeEmpId(),
+                notification.getEmployeeEmail(),
+                notification.getDesignation(),
+                notification.getTaskId(),
+                notification.getTargetPage(),
+                notification.getLeaveId(),
+                Boolean.TRUE.equals(notification.getActive()));
+    }
 }
 </file>
 
@@ -6187,6 +6645,9 @@ public class AuthService {
     @Autowired
     private PasswordResetTokenStore passwordResetTokenStore;
 
+    @Autowired
+    private AdminNotificationService adminNotificationService;
+
     // ─────────────────────────────────────────────────────────────────────────
     // SIGNUP — Step 1
     // ─────────────────────────────────────────────────────────────────────────
@@ -6334,6 +6795,7 @@ public class AuthService {
             employee.setVerified(true);
             employeeRepository.save(employee);
             log.info("Employee email verified (pending admin approval): empId={}", employee.getEmpId());
+            adminNotificationService.createSignupRequestNotification(employee);
 
             try {
                 employeeManagementService.syncEmployeeToAppUser(employee);
@@ -7089,10 +7551,16 @@ import java.util.List;
 @Service
 public class LeaveService {
     private static final Logger log = LoggerFactory.getLogger(LeaveService.class);
+
     @Autowired
     private LeaveRepository leaveRepository;
+
     @Autowired
     private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AdminNotificationService adminNotificationService;
+
     public Leave applyLeave(LeaveRequestDTO dto) {
         // Look up Employee by numeric id (employees.id — the PK returned at login)
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
@@ -7111,6 +7579,7 @@ public class LeaveService {
         leave.setStatus("REVIEW");
         leave.setAppliedDate(LocalDate.now());
         Leave saved = leaveRepository.save(leave);
+        adminNotificationService.createLeaveRequestNotification(saved);
         log.info("Leave applied: employeeId={}, days={}, type={}",
                 dto.getEmployeeId(), days, dto.getLeaveType());
         return saved;
@@ -7130,6 +7599,7 @@ public class LeaveService {
         leave.setStatus(status);
         leave.setActionDate(LocalDate.now());
         Leave updated = leaveRepository.save(leave);
+        adminNotificationService.createLeaveActionNotification(updated);
         log.info("Leave id={} updated to status={}", id, status);
         return updated;
     }
@@ -7348,6 +7818,20 @@ public class MessageService {
                 .filter(m -> m.getCreatedAt() != null && m.getCreatedAt().isAfter(oneDayAgo))
                 .map(this::toDto)
                 .toList();
+    }
+
+    public List<MessageResponseDto> getUnreadMessagesForEmployee(String employeeId) {
+        return adminMessageRepository.findByRecipientEmployeeIdAndIsReadFalseOrderByCreatedAtDesc(employeeId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    public void markMessageAsRead(Long messageId) {
+        AdminMessage message = adminMessageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+        message.setIsRead(true);
+        adminMessageRepository.save(message);
     }
 
     /**
@@ -8002,16 +8486,14 @@ public class SalaryService {
 <file path="src/main/java/com/blisssierra/hrms/service/TaskService.java">
 package com.blisssierra.hrms.service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.TaskAdminRequest;
 import com.blisssierra.hrms.dto.TaskUserUpdateRequest;
 import com.blisssierra.hrms.entity.Employee;
@@ -8041,11 +8523,14 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
+    private final AdminNotificationService adminNotificationService;
 
     public TaskService(TaskRepository taskRepository,
-            EmployeeRepository employeeRepository) {
+            EmployeeRepository employeeRepository,
+            AdminNotificationService adminNotificationService) {
         this.taskRepository = taskRepository;
         this.employeeRepository = employeeRepository;
+        this.adminNotificationService = adminNotificationService;
     }
 
     // ── Admin queries ─────────────────────────────────────────────────────────
@@ -8060,6 +8545,58 @@ public class TaskService {
         }
         return taskRepository.findByAssigneeEmployeeIdIgnoreCaseOrderByUpdatedAtDesc(
                 employeeId.trim());
+    }
+
+    public List<NotificationDto> getUserTaskNotifications(String employeeId) {
+        if (employeeId == null || employeeId.trim().isEmpty()) {
+            return List.of();
+        }
+
+        return taskRepository
+                .findByAssigneeEmployeeIdIgnoreCaseAndAdminUpdatePendingForUserTrueOrderByUpdatedAtDesc(
+                        employeeId.trim())
+                .stream()
+                .map(task -> new NotificationDto(
+                        task.getId(),
+                        "TASK_ASSIGNED",
+                        task.getStatus() != null && !"todo".equalsIgnoreCase(task.getStatus())
+                                ? "Task updated by admin"
+                                : "New task assigned",
+                        task.getTitle(),
+                        false,
+                        task.getUpdatedAt(),
+                        task.getAssigneeId(),
+                        task.getAssigneeName(),
+                        task.getAssigneeEmployeeId(),
+                        null,
+                        null,
+                        task.getId(),
+                        "tasks"))
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationDto> getAdminTaskNotifications() {
+        return taskRepository.findByUserUpdatePendingForAdminTrueOrderByUpdatedAtDesc()
+                .stream()
+                .map(task -> new NotificationDto(
+                        task.getId(),
+                        "TASK_UPDATED",
+                        "Task updated by employee",
+                        String.format("%s updated \"%s\" to %s (%d%%)",
+                                task.getAssigneeName(),
+                                task.getTitle(),
+                                humanizeStatus(task.getStatus()),
+                                task.getProgress()),
+                        false,
+                        task.getUpdatedAt(),
+                        task.getAssigneeId(),
+                        task.getAssigneeName(),
+                        task.getAssigneeEmployeeId(),
+                        null,
+                        null,
+                        task.getId(),
+                        "tasks"))
+                .collect(Collectors.toList());
     }
 
     // ── Employee search (used by admin task assignment dropdown) ─────────────
@@ -8115,6 +8652,8 @@ public class TaskService {
         task.setStatus("todo");
         task.setProgress(0);
         task.setCommentsCount(0);
+        task.setAdminUpdatePendingForUser(true);
+        task.setUserUpdatePendingForAdmin(false);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
 
@@ -8139,6 +8678,8 @@ public class TaskService {
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             task.setStatus(normalizeStatus(request.getStatus()));
         }
+        task.setAdminUpdatePendingForUser(true);
+        task.setUserUpdatePendingForAdmin(false);
         task.setUpdatedAt(LocalDateTime.now());
 
         return taskRepository.save(task);
@@ -8169,8 +8710,35 @@ public class TaskService {
             task.setCommentsCount(task.getCommentsCount() + 1);
         }
 
+        task.setAdminUpdatePendingForUser(false);
+        task.setUserUpdatePendingForAdmin(true);
         task.setUpdatedAt(LocalDateTime.now());
-        return taskRepository.save(task);
+        Task updated = taskRepository.save(task);
+
+        adminNotificationService.createTaskUpdatedNotification(
+                updated,
+                String.format("%s (%s) updated \"%s\" to %s (%d%%).",
+                        updated.getAssigneeName(),
+                        updated.getAssigneeEmployeeId(),
+                        updated.getTitle(),
+                        humanizeStatus(updated.getStatus()),
+                        updated.getProgress()));
+
+        return updated;
+    }
+
+    public void markUserTaskNotificationAsRead(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+        task.setAdminUpdatePendingForUser(false);
+        taskRepository.save(task);
+    }
+
+    public void markAdminTaskNotificationAsRead(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));
+        task.setUserUpdatePendingForAdmin(false);
+        taskRepository.save(task);
     }
 
     public void deleteTask(Long taskId) {
@@ -8192,12 +8760,23 @@ public class TaskService {
 
     private String normalizeStatus(String status) {
         String s = status == null ? "todo" : status.trim().toLowerCase();
-        return List.of("todo", "in-progress", "review", "done").contains(s) ? s : "todo";
+        if ("review".equals(s) || "in review".equals(s)) {
+            return "in-progress";
+        }
+        return List.of("todo", "in-progress", "done").contains(s) ? s : "todo";
     }
 
     private String generateTaskCode() {
         return "T" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 8).toUpperCase();
+    }
+
+    private String humanizeStatus(String status) {
+        return switch (normalizeStatus(status)) {
+            case "in-progress" -> "In Progress";
+            case "done" -> "Done";
+            default -> "To Do";
+        };
     }
 }
 </file>
@@ -8217,7 +8796,7 @@ server.port=8080
 # ─── MySQL Database ───────────────────────────────────────────────────────────
 # Update the URL, username and password to match your local MySQL setup.
 # The database must exist before starting the app (CREATE DATABASE hrms_db;)
-spring.datasource.url=jdbc:mysql://localhost:3306/hrms_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.url=jdbc:mysql://localhost:3306/hrmss_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=root
 spring.datasource.password=root
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver

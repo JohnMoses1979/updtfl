@@ -14,10 +14,16 @@ import java.util.List;
 @Service
 public class LeaveService {
     private static final Logger log = LoggerFactory.getLogger(LeaveService.class);
+
     @Autowired
     private LeaveRepository leaveRepository;
+
     @Autowired
     private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AdminNotificationService adminNotificationService;
+
     public Leave applyLeave(LeaveRequestDTO dto) {
         // Look up Employee by numeric id (employees.id — the PK returned at login)
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
@@ -36,6 +42,7 @@ public class LeaveService {
         leave.setStatus("REVIEW");
         leave.setAppliedDate(LocalDate.now());
         Leave saved = leaveRepository.save(leave);
+        adminNotificationService.createLeaveRequestNotification(saved);
         log.info("Leave applied: employeeId={}, days={}, type={}",
                 dto.getEmployeeId(), days, dto.getLeaveType());
         return saved;
@@ -55,6 +62,7 @@ public class LeaveService {
         leave.setStatus(status);
         leave.setActionDate(LocalDate.now());
         Leave updated = leaveRepository.save(leave);
+        adminNotificationService.createLeaveActionNotification(updated);
         log.info("Leave id={} updated to status={}", id, status);
         return updated;
     }

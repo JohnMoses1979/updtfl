@@ -10,4 +10,6 @@ import com.blisssierra.hrms.entity.Task;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findAllByOrderByUpdatedAtDesc();
     List<Task> findByAssigneeEmployeeIdIgnoreCaseOrderByUpdatedAtDesc(String assigneeEmployeeId);
+    List<Task> findByAssigneeEmployeeIdIgnoreCaseAndAdminUpdatePendingForUserTrueOrderByUpdatedAtDesc(String assigneeEmployeeId);
+    List<Task> findByUserUpdatePendingForAdminTrueOrderByUpdatedAtDesc();
 }

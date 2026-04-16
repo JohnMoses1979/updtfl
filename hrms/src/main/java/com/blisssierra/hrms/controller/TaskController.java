@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import com.blisssierra.hrms.dto.ApiResponse;
+import com.blisssierra.hrms.dto.NotificationDto;
 import com.blisssierra.hrms.dto.TaskAdminRequest;
 import com.blisssierra.hrms.dto.TaskUserUpdateRequest;
 import com.blisssierra.hrms.dto.UserOptionDto;
@@ -38,6 +39,18 @@ public class TaskController {
     public ApiResponse<List<Task>> getAllTasks() {
         return new ApiResponse<>(true, "Tasks fetched successfully",
                 taskService.getAllTasks());
+    }
+
+    @GetMapping("/api/tasks/admin/notifications")
+    public ApiResponse<List<NotificationDto>> getAdminTaskNotifications() {
+        return new ApiResponse<>(true, "Admin task notifications fetched successfully",
+                taskService.getAdminTaskNotifications());
+    }
+
+    @PutMapping("/api/tasks/admin/notifications/{taskId}/read")
+    public ApiResponse<Void> markAdminTaskNotificationAsRead(@PathVariable Long taskId) {
+        taskService.markAdminTaskNotificationAsRead(taskId);
+        return new ApiResponse<>(true, "Admin task notification marked as read", null);
     }
 
     @PostMapping("/api/tasks/admin")
@@ -75,12 +88,24 @@ public class TaskController {
                 taskService.getTasksByEmployeeId(employeeId));
     }
 
+    @GetMapping("/api/tasks/user/{employeeId}/notifications")
+    public ApiResponse<List<NotificationDto>> getUserTaskNotifications(@PathVariable String employeeId) {
+        return new ApiResponse<>(true, "User task notifications fetched successfully",
+                taskService.getUserTaskNotifications(employeeId));
+    }
+
     @PutMapping("/api/tasks/user/{taskId}")
     public ApiResponse<Task> updateTaskByUser(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskUserUpdateRequest request) {
         return new ApiResponse<>(true, "Task updated by user successfully",
                 taskService.updateTaskByUser(taskId, request));
+    }
+
+    @PutMapping("/api/tasks/user/{taskId}/notification-read")
+    public ApiResponse<Void> markUserTaskNotificationAsRead(@PathVariable Long taskId) {
+        taskService.markUserTaskNotificationAsRead(taskId);
+        return new ApiResponse<>(true, "User task notification marked as read", null);
     }
 
     // ── Employee lookup endpoints (used by admin task assignment dropdown) ────

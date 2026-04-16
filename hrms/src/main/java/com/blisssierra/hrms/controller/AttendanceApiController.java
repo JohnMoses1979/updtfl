@@ -93,6 +93,14 @@ public class AttendanceApiController {
         return ResponseEntity.ok(records);
     }
 
+    @GetMapping("/history/{empId}")
+    public ResponseEntity<List<AttendanceRecordDto>> getEmployeeHistory(@PathVariable String empId) {
+        String normId = empId.trim().toUpperCase();
+        log.info("GET /api/attendance/history/{}", normId);
+        List<AttendanceRecordDto> records = attendanceApiService.getEmployeeHistory(normId);
+        return ResponseEntity.ok(records);
+    }
+
     // ── Inner request body DTO ───────────────────────────────────────────────
     static class CheckInOutRequest {
         private String empId;
