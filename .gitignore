@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.expo/
+target/
+venv/
+__pycache__/
