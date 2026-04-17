@@ -1,9 +1,9 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-const WEB_HOST = "localhost";
+const WEB_HOST = "16.112.62.13";
 const PORT = "8080";
-const FALLBACK_MOBILE_HOST = "192.168.0.11";
+const FALLBACK_MOBILE_HOST = "16.112.62.13";
 
 function extractHost(candidate) {
   if (!candidate || typeof candidate !== "string") return null;

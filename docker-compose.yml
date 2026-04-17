@@ -23,13 +23,15 @@ services:
       - fastapi
     ports:
       - "8080:8080"
+
+    env_file:
+       - ./hrms/.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hrmss_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       PYTHON_FACE_API_URL: http://fastapi:8000
-      SPRING_MAIL_USERNAME: ""
-      SPRING_MAIL_PASSWORD: ""
+    
 
     volumes:
       - ./hrms/uploads:/app/uploads

@@ -11,26 +11,9 @@ function extractHost(candidate) {
   return noProtocol.split(":")[0] || null;
 }
 
-function resolveMobileHost() {
-  const expoHost =
-    extractHost(Constants.expoConfig?.hostUri) ||
-    extractHost(Constants.manifest2?.extra?.expoClient?.hostUri) ||
-    extractHost(Constants.manifest?.debuggerHost) ||
-    extractHost(Constants.expoGoConfig?.debuggerHost);
+const EC2_IP = "http://16.112.62.13:8080";
 
-  // Fallback to the hardcoded LAN IP if Expo detection fails
-  return expoHost || "192.168.0.28";
-}
-
-const PORT = "8080";
-
-const getBaseUrl = () => {
-  if (Platform.OS === "web") return `http://localhost:${PORT}`;
-  const host = resolveMobileHost();
-  return `http://${host}:${PORT}`;
-};
-
-export const BASE_URL = getBaseUrl();
+export const BASE_URL = EC2_IP;
 
 export const ENDPOINTS = {
   signup: "/api/auth/signup",
