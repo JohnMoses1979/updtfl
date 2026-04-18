@@ -15,8 +15,13 @@ function extractHost(candidate) {
 }
 
 function resolveMobileHost() {
-  // For mobile, always use the remote server IP since the backend is deployed remotely
-  return "16.112.62.13";
+  const expoHost =
+    extractHost(Constants.expoConfig?.hostUri) ||
+    extractHost(Constants.manifest2?.extra?.expoClient?.hostUri) ||
+    extractHost(Constants.manifest?.debuggerHost) ||
+    extractHost(Constants.expoGoConfig?.debuggerHost);
+
+  return expoHost || FALLBACK_MOBILE_HOST;
 }
 
 const API_HOST = Platform.OS === "web" ? WEB_HOST : resolveMobileHost();
