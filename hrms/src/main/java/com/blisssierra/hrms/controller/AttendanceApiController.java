@@ -136,16 +136,23 @@ public class AttendanceApiController {
         boolean checkedIn = a.getCheckInTime() != null;
         boolean checkedOut = a.getCheckOutTime() != null;
 
+        // Convert Instant times to IST (Asia/Kolkata) for display
+        java.time.ZoneId officeZone = java.time.ZoneId.of("Asia/Kolkata");
+        java.time.format.DateTimeFormatter timeFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+
+        String checkInStr = checkedIn
+                ? a.getCheckInTime().atZone(officeZone).format(timeFmt)
+                : "";
+        String checkOutStr = checkedOut
+                ? a.getCheckOutTime().atZone(officeZone).format(timeFmt)
+                : "";
+
         return ResponseEntity.ok(java.util.Map.of(
                 "checkedIn", checkedIn,
                 "checkedOut", checkedOut,
                 "date", today.toString(),
-                "checkIn", checkedIn
-                        ? a.getCheckInTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                        : "",
-                "checkOut", checkedOut
-                        ? a.getCheckOutTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                        : ""));
+                "checkIn", checkInStr,
+                "checkOut", checkOutStr));
     }
 
     // // ── GET /api/attendance/status/{empId}

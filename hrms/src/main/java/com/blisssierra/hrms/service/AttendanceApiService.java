@@ -1,7 +1,9 @@
 package com.blisssierra.hrms.service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -25,12 +27,12 @@ import com.blisssierra.hrms.repository.SalaryRepository;
 /**
  * AttendanceApiService (merged)
  *
+ * TIMEZONE FIX: Using Instant.now() for UTC-always timestamps
+ * All times are stored in UTC and formatted for client display.
+ *
  * Responsibilities:
  * 1. One-row-per-day check-in / check-out (Project A logic — preserved)
  * 2. Salary update on successful check-out (Project B logic — absorbed)
- *
- * Project B's AttendanceService is NOT a separate bean — its salary logic
- * lives here to avoid a duplicate service and circular dependency.
  */
 @Service
 public class AttendanceApiService {
@@ -63,6 +65,7 @@ public class AttendanceApiService {
      * - Duplicate guard: if a record already exists for (empId + today), returns
      * it.
      * - Sets present=true on the new record (Project B requirement).
+     * - Uses Instant.now() for UTC timestamp
      */
     @Transactional
     public AttendanceRecordDto recordCheckIn(String empId) {
@@ -84,7 +87,7 @@ public class AttendanceApiService {
         record.setEmpId(normId);
         record.setEmployeeName(name);
         record.setAttendanceDate(today);
-        record.setCheckInTime(LocalDateTime.now());
+        record.setCheckInTime(Instant.now());  // ← UTC Instant
         record.setPresent(true); // Project B field
 
         Attendance saved = attendanceRepository.save(record);
@@ -100,10 +103,8 @@ public class AttendanceApiService {
      * - Finds the existing record for (empId + today).
      * - Updates checkOutTime on the same row (no new row).
      * - Triggers salary update (Project B logic).
+     * - Uses Instant.now() for UTC timestamp
      */
-    // src/main/java/com/blisssierra/hrms/service/AttendanceApiService.java
-    // REPLACE the recordCheckOut method with this version:
-
     @Transactional
     public Optional<AttendanceRecordDto> recordCheckOut(String empId) {
         String normId = empId.trim().toUpperCase();
@@ -119,13 +120,13 @@ public class AttendanceApiService {
 
         Attendance record = existingOpt.get();
 
-        // ── NEW: Prevent double check-out ─────────────────────────────────
+        // ── Prevent double check-out ─────────────────────────────────
         if (record.getCheckOutTime() != null) {
             log.info("  ℹ️  Already checked out for empId={} on {}", normId, today);
             return Optional.of(toDto(record)); // return existing record, don't update
         }
 
-        record.setCheckOutTime(LocalDateTime.now());
+        record.setCheckOutTime(Instant.now());  // ← UTC Instant
         Attendance saved = attendanceRepository.save(record);
 
         long durationMinutes = ChronoUnit.MINUTES.between(
@@ -210,9 +211,26 @@ public class AttendanceApiService {
 
     // ── HELPERS ──────────────────────────────────────────────────────────────
 
+    /**
+     * Converts Attendance entity to DTO with proper timezone handling.
+     * 
+     * Times are formatted to IST (Asia/Kolkata) to match office location.
+     * The frontend receives both raw ISO timestamps (from @JsonFormat)
+     * and formatted time strings for display.
+     */
     private AttendanceRecordDto toDto(Attendance a) {
-        String checkIn = a.getCheckInTime() != null ? a.getCheckInTime().format(TIME_FMT) : null;
-        String checkOut = a.getCheckOutTime() != null ? a.getCheckOutTime().format(TIME_FMT) : null;
+        // Format times in Asia/Kolkata timezone
+        ZoneId officeZone = ZoneId.of("Asia/Kolkata");
+        
+        String checkIn = a.getCheckInTime() != null ? 
+            a.getCheckInTime()
+                .atZone(officeZone)
+                .format(DateTimeFormatter.ofPattern("HH:mm")) : null;
+        
+        String checkOut = a.getCheckOutTime() != null ? 
+            a.getCheckOutTime()
+                .atZone(officeZone)
+                .format(DateTimeFormatter.ofPattern("HH:mm")) : null;
 
         long durationMinutes = -1;
         if (a.getCheckInTime() != null && a.getCheckOutTime() != null) {

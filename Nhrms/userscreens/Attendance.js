@@ -1963,6 +1963,8 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function parseAttendanceDateTime(dateString, timeString) {
   if (!timeString) return null;
+  // Backend sends times in IST format "HH:mm"
+  // Create Date object for today's date with the IST time
   const [h = "0", m = "0"] = String(timeString).split(":");
   const base = dateString ? new Date(`${dateString}T00:00:00`) : new Date();
   base.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
@@ -1971,21 +1973,51 @@ function parseAttendanceDateTime(dateString, timeString) {
 
 function toHistoryEntry(record) {
   const date = record?.date ? new Date(`${record.date}T00:00:00`) : new Date();
-  const checkInDate = parseAttendanceDateTime(record?.date, record?.checkIn);
-  const checkOutDate = parseAttendanceDateTime(record?.date, record?.checkOut);
+
+  // Backend sends times in IST format "HH:mm" (e.g., "14:00" = 2:00 PM IST)
+  // For duration calculation, create Date objects representing these IST times
+  const checkInTimeStr = record?.checkIn;
+  const checkOutTimeStr = record?.checkOut;
+
+  // Create Date objects for duration calculation (treat as today's date with IST times)
+  const checkInDate = checkInTimeStr ? (() => {
+    const [h, m] = checkInTimeStr.split(':');
+    const d = new Date(date);
+    d.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+    return d;
+  })() : null;
+
+  const checkOutDate = checkOutTimeStr ? (() => {
+    const [h, m] = checkOutTimeStr.split(':');
+    const d = new Date(date);
+    d.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+    return d;
+  })() : null;
+
   const totalSeconds =
     typeof record?.durationMinutes === "number" && record.durationMinutes >= 0
       ? record.durationMinutes * 60
-      : checkInDate
-        ? Math.max(0, Math.floor((Date.now() - checkInDate.getTime()) / 1000))
+      : checkInDate && checkOutDate
+        ? Math.max(0, Math.floor((checkOutDate.getTime() - checkInDate.getTime()) / 1000))
         : 0;
+
+  // Format times: convert "HH:mm" to 12-hour format (e.g., "14:00" → "2:00 PM")
+  const formatTimeString = (timeStr) => {
+    if (!timeStr) return "--:-- --";
+    const [h, m] = timeStr.split(":");
+    const hour = parseInt(h, 10);
+    const min = m.padStart(2, "0");
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = ((hour + 11) % 12 + 1).toString().padStart(2, "0");
+    return `${displayHour}:${min} ${ampm}`;
+  };
 
   return {
     id: record?.id ?? `${record?.date}-${record?.checkIn}-${record?.checkOut}`,
     date,
     totalSeconds,
-    checkin: checkInDate ? formatTime(checkInDate) : "--:-- --",
-    checkout: checkOutDate ? formatTime(checkOutDate) : "--:-- --",
+    checkin: formatTimeString(checkInTimeStr),
+    checkout: formatTimeString(checkOutTimeStr),
   };
 }
 

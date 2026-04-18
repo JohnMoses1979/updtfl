@@ -4,12 +4,16 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * One attendance record per employee per calendar day.
  * Merged from Project A (face-verify flow) + Project B (salary trigger flow).
+ * 
+ * TIMEZONE FIX: Using Instant instead of LocalDateTime
+ * Instant is always in UTC and timezone-independent.
  */
 @Entity
 @Table(name = "attendance_records")
@@ -34,16 +38,18 @@ public class Attendance {
     @Column(name = "attendance_date", nullable = false)
     private LocalDate attendanceDate;
 
-    /** Timestamp when employee checked in. */
+    /** Timestamp when employee checked in (UTC). */
     @Column(name = "check_in_time")
-    private LocalDateTime checkInTime;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+    private Instant checkInTime;
 
     /**
-     * Timestamp when employee checked out.
+     * Timestamp when employee checked out (UTC).
      * Null while session is still open.
      */
     @Column(name = "check_out_time")
-    private LocalDateTime checkOutTime;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+    private Instant checkOutTime;
 
     /**
      * Whether the employee completed a present day.
@@ -53,19 +59,21 @@ public class Attendance {
     private boolean present = false;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+    private Instant createdAt;
 
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+    private Instant updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        createdAt = Instant.now();
+        updatedAt = Instant.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = Instant.now();
     }
 }
