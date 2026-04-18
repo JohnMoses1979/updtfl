@@ -31,7 +31,7 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       PYTHON_FACE_API_URL: http://fastapi:8000
-    
+      TZ: Asia/Kolkata    
 
     volumes:
       - ./hrms/uploads:/app/uploads
