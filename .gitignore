@@ -6,3 +6,8 @@ node_modules/
 target/
 venv/
 __pycache__/
+hrms/.env
+fastapi-service/venv/
+Nhrms/node_modules/
+__pycache__/
+*.log
