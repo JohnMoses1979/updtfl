@@ -11,7 +11,7 @@ function extractHost(candidate) {
   return noProtocol.split(":")[0] || null;
 }
 
-const EC2_IP = "http://16.112.62.13:8080";
+const EC2_IP = "https://workhrms.in";
 
 export const BASE_URL = EC2_IP;
 
