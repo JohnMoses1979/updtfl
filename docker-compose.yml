@@ -27,7 +27,7 @@ services:
     env_file:
        - ./hrms/.env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hrmss_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hrmss_db?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       PYTHON_FACE_API_URL: http://fastapi:8000
@@ -44,8 +44,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./fastapi-service/face_data:/app/face_data
-      - /home/ubuntu/hrms-data/uploads:/app/uploads
+          - /home/ubuntu/hrms-data/uploads:/app/uploads
+          - /home/ubuntu/hrms-data/face_data:/app/face_data
 
 volumes:
   mysql_data:
