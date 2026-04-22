@@ -34,7 +34,7 @@ services:
       TZ: Asia/Kolkata    
 
     volumes:
-      - ./hrms/uploads:/app/uploads
+      - /home/ubuntu/hrms-data/uploads:/app/uploads
 
   fastapi:
     build:
@@ -45,7 +45,7 @@ services:
       - "8000:8000"
     volumes:
       - ./fastapi-service/face_data:/app/face_data
-      - ./hrms/uploads:/app/uploads
+      - /home/ubuntu/hrms-data/uploads:/app/uploads
 
 volumes:
   mysql_data:
