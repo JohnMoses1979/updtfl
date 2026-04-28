@@ -1,8 +1,8 @@
 package com.blisssierra.hrms.service;
-import java.time.LocalDate;
+
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -34,11 +34,12 @@ import com.blisssierra.hrms.repository.SalaryRepository;
 public class AttendanceApiService {
     private static final Logger log = LoggerFactory.getLogger(AttendanceApiService.class);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    /**
-     * Per-day salary increment sourced from Project B. Should ideally be driven
-     * by Employee.monthlySalary / working days. Kept as a constant to preserve
-     * Project B's existing behaviour.
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+    /** 
+     * Per-day salary increment sourced from Project B.
+     * Should ideally be driven by Employee.monthlySalary / working days.
+     * Kept as a constant to preserve Project B's existing behaviour.
      */
     private static final double PER_DAY_AMOUNT = 612.0;
     @Autowired

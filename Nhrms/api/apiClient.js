@@ -1,11 +1,25 @@
-import { BASE_URL } from "./config";
-import { tokenStore } from "./tokenStore";
+import { Platform } from "react-native";
+import Constants from "expo-constants";
 
-function normalizeApiBaseUrl(baseUrl) {
-  const trimmed = String(baseUrl || "").trim().replace(/\/+$/, "");
-  if (!trimmed) return "";
-  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+const WEB_HOST = "16.112.62.13";
+const PORT = "8080";
+const FALLBACK_MOBILE_HOST = "16.112.62.13";
+
+function extractHost(candidate) {
+  if (!candidate || typeof candidate !== "string") return null;
+  const trimmed = candidate.trim();
+  if (!trimmed) return null;
+
+  const noProtocol = trimmed.replace(/^https?:\/\//, "");
+  return noProtocol.split(":")[0] || null;
 }
+
+function resolveMobileHost() {
+  
+  return "16.112.62.13";
+}
+
+const API_HOST = Platform.OS === "web" ? WEB_HOST : resolveMobileHost();
 
 export const API_BASE_URL = normalizeApiBaseUrl(BASE_URL);
 

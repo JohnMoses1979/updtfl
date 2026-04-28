@@ -308,6 +308,7 @@ function BottomTabBar({ activeTab, onTabPress }) {
 
 function InnerApp() {
   const { logout } = useUser();
+  const { logout } = useUser();
   const [screen, setScreen] = useState("landing");
   const [adminProfile, setAdminProfile] = useState({});
   const [activeTab, setActiveTab] = useState(0);
@@ -524,9 +525,11 @@ function InnerApp() {
 export default function App() {
   installAuthFetchInterceptor();
   return (
-    <UserProvider>
-      <InnerApp />
-    </UserProvider>
+    <SafeAreaProvider>
+      <UserProvider>
+        <InnerApp />
+      </UserProvider>
+    </SafeAreaProvider>
   );
 }
 

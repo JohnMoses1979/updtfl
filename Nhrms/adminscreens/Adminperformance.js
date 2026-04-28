@@ -544,9 +544,10 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, SafeAreaView,
+  View, Text, ScrollView, TouchableOpacity,
   StatusBar, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { taskApi } from '../api/taskapi';
 
 const C = {

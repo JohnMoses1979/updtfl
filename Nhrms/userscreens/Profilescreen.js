@@ -13,18 +13,25 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
   Platform,
   StatusBar,
+  Switch,
   useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { useState, useEffect } from "react";
 import { Image } from "react-native";
 import { BASE_URL } from "../api/config";
+import * as LocalAuthentication from "expo-local-authentication";
+import {
+  clearBiometricLoginSettings,
+  getBiometricLoginSettings,
+  saveBiometricLoginSettings,
+} from "../utils/biometricLogin";
 const C = {
   bg: "#112235",
   orange: "#2F6E8E",
@@ -133,20 +140,125 @@ function ContactSection({ email, phone }) {
     </View>
   );
 }
+
+function BiometricSection({ enabled, available, onToggle, registeredAt, deviceId }) {
+  const formatDate = (isoString) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  };
+
+  return (
+    <View style={styles.menuSection}>
+      <Text style={styles.menuSectionTitle}>SECURITY</Text>
+      <View style={styles.menuCard}>
+        <View style={styles.menuRow}>
+          <View style={styles.menuLeft}>
+            <View style={[styles.menuIconBox, { backgroundColor: "#0f2035" }]}>
+              <Text style={styles.menuIconEmoji}>👆</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.menuLabel}>Fingerprint Login</Text>
+              <Text style={styles.menuSubLabel}>
+                {available ? "Ask fingerprint next time you sign in" : "No biometric lock enrolled"}
+              </Text>
+              {enabled && registeredAt && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={{ color: "#AAAAAA", fontSize: 11 }}>
+                    ✓ Registered: {formatDate(registeredAt)}
+                  </Text>
+                  {deviceId && (
+                    <Text style={{ color: "#AAAAAA", fontSize: 11 }}>
+                      📱 Device: {deviceId}
+                    </Text>
+                  )}
+                  <Text style={{ color: "#38BDF8", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    🔒 Only your registered fingerprint can access this account
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <Switch
+            value={enabled}
+            disabled={!available}
+            onValueChange={onToggle}
+            trackColor={{ false: "#1a3a5c", true: "#2F6E8E" }}
+            thumbColor={enabled ? C.white : C.gray}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen({ onBack, onNavigate }) {
   const { user, logout } = useUser();
   const { width } = useWindowDimensions();
-  const [profileImageUri, setProfileImageUri] = useState(null);
+  const [profileImageUri, setProfileImageUri] = useState(user?.avatarUri || "");
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricRegisteredAt, setBiometricRegisteredAt] = useState(null);
+  const [biometricDeviceId, setBiometricDeviceId] = useState(null);
 
   useEffect(() => {
+    setProfileImageUri(user?.avatarUri || "");
     if (!user?.empId) return;
     fetch(`${BASE_URL}/api/employees/by-empid/${user.empId}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.profileImage) setProfileImageUri(data.profileImage);
+        const savedImage = data.profileImage || data.avatarUri || "";
+        if (savedImage) setProfileImageUri(savedImage);
       })
       .catch(() => { });
+  }, [user?.empId, user?.avatarUri]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        setBiometricAvailable(compatible && enrolled);
+
+        const settings = await getBiometricLoginSettings();
+        const isEnabledForThisUser = settings?.enabled === true && settings?.user?.empId === user?.empId;
+        setBiometricEnabled(isEnabledForThisUser);
+        
+        if (isEnabledForThisUser) {
+          setBiometricRegisteredAt(settings?.registeredAt || null);
+          setBiometricDeviceId(settings?.deviceId || null);
+        }
+      } catch {
+        setBiometricAvailable(false);
+        setBiometricEnabled(false);
+      }
+    })();
   }, [user?.empId]);
+
+  const handleBiometricToggle = async (enabled) => {
+    if (!enabled) {
+      await clearBiometricLoginSettings();
+      setBiometricEnabled(false);
+      return;
+    }
+
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Enable Fingerprint Login",
+        fallbackLabel: "Use device passcode",
+        disableDeviceFallback: false,
+        cancelLabel: "Cancel",
+      });
+
+      if (!result.success) return;
+
+      await saveBiometricLoginSettings(user);
+      setBiometricEnabled(true);
+    } catch {
+      Alert.alert("Not Available", "Could not enable fingerprint login right now.");
+    }
+  };
+
   const isSmallPhone = width < 360;
   const avatarSize = width < 360 ? 92 : width < 420 ? 104 : 114;
   // Build profile from real user data (falls back to empty strings gracefully)
@@ -210,6 +322,13 @@ export default function ProfileScreen({ onBack, onNavigate }) {
         {/* Contact section — email from backend */}
         <ContactSection email={profile.email} phone={profile.phone} />
         <MenuSection title="ACCOUNT" items={accountItems} />
+        <BiometricSection
+          enabled={biometricEnabled}
+          available={biometricAvailable}
+          onToggle={handleBiometricToggle}
+          registeredAt={biometricRegisteredAt}
+          deviceId={biometricDeviceId}
+        />
         <MenuSection title="SETTINGS" items={settingsItems} />
       </ScrollView>
     </SafeAreaView>
@@ -270,5 +389,6 @@ const styles = StyleSheet.create({
   },
   menuIconEmoji: { fontSize: 17 },
   menuLabel: { color: C.white, fontSize: 14, fontWeight: "500", flexShrink: 1 },
+  menuSubLabel: { color: C.gray, fontSize: 11, marginTop: 3 },
   menuArrow: { color: C.graySoft, fontSize: 20, fontWeight: "400", marginLeft: 10 },
 });

@@ -16,13 +16,13 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   TextInput,
   Modal,
   RefreshControl,
   ActivityIndicator,  // ADD THIS
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { taskApi } from "../api/taskapi";
 import { useUser } from "../context/UserContext";
 import { BASE_URL } from "../api/config";  // ADD THIS

@@ -657,15 +657,23 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    View, Text, StyleSheet, SafeAreaView, ScrollView,
+    View, Text, StyleSheet, ScrollView,
     TouchableOpacity, TextInput, Platform, Alert, StatusBar,
-    useWindowDimensions, Image,
+    useWindowDimensions, Image, Switch,
 } from "react-native";
+import * as LocalAuthentication from "expo-local-authentication";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AppDatePickerModal from "../components/AppDatePickerModal";
 import AppOptionPickerModal from "../components/AppOptionPickerModal";
 import { pickProfileImage } from "../utils/Profileimagepicker";
 import { BASE_URL } from "../api/config";
 import { useUser } from "../context/UserContext";
+import {
+    clearAdminBiometricLoginSettings,
+    getAdminBiometricLoginSettings,
+    saveAdminBiometricLoginSettings,
+    updateAdminBiometricLoginUserIfEnabled,
+} from "../utils/biometricLogin";
  
 const INDIA_LOCATION_OPTIONS = {
     India: {
@@ -769,6 +777,41 @@ function AvatarSection({ firstName, lastName, avatarUri, onPickImage, onRemoveIm
     );
 }
 
+function BiometricSection({ enabled, available, registeredAt, deviceId, onToggle }) {
+    const formatDate = (value) => {
+        if (!value) return "";
+        const date = new Date(value);
+        return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    };
+
+    return (
+        <View style={styles.securitySection}>
+            <Text style={styles.securityTitle}>Security</Text>
+            <View style={styles.securityCard}>
+                <View style={styles.securityTextWrap}>
+                    <Text style={styles.securityLabel}>Fingerprint Admin Login</Text>
+                    <Text style={styles.securitySub}>
+                        {available ? "Use device biometric for admin sign-in" : "No biometric lock enrolled"}
+                    </Text>
+                    {enabled && registeredAt ? (
+                        <Text style={styles.securityMeta}>
+                            Registered: {formatDate(registeredAt)}
+                            {deviceId ? `\nDevice: ${deviceId}` : ""}
+                        </Text>
+                    ) : null}
+                </View>
+                <Switch
+                    value={enabled}
+                    disabled={!available}
+                    onValueChange={onToggle}
+                    trackColor={{ false: C.border, true: C.orange }}
+                    thumbColor={enabled ? C.white : C.gray}
+                />
+            </View>
+        </View>
+    );
+}
+
 export default function AdminPersonalScreen({ onBack, onSave, initialData = {} }) {
     const { user, updateProfile } = useUser();
     const { width } = useWindowDimensions();
@@ -793,6 +836,10 @@ export default function AdminPersonalScreen({ onBack, onSave, initialData = {} }
     const [address, setAddress] = useState(initialData.address || user?.address || "");
     const [avatarUri, setAvatarUri] = useState(initialData.avatarUri || user?.avatarUri || "");
     const [saving, setSaving] = useState(false);
+    const [biometricAvailable, setBiometricAvailable] = useState(false);
+    const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const [biometricRegisteredAt, setBiometricRegisteredAt] = useState(null);
+    const [biometricDeviceId, setBiometricDeviceId] = useState(null);
 
     const [dobPickerVisible, setDobPickerVisible] = useState(false);
     const [activeLocationPicker, setActiveLocationPicker] = useState(null);
@@ -816,6 +863,62 @@ export default function AdminPersonalScreen({ onBack, onSave, initialData = {} }
     useEffect(() => {
         if (city && !cityOptions.includes(city)) setCity("");
     }, [city, cityOptions]);
+
+    const buildAdminBiometricProfile = () => {
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+        return {
+            name: fullName || "Admin",
+            designation: designation.trim() || "Administrator",
+            avatarUri,
+        };
+    };
+
+    const loadBiometricState = async () => {
+        try {
+            const compatible = await LocalAuthentication.hasHardwareAsync();
+            const enrolled = await LocalAuthentication.isEnrolledAsync();
+            setBiometricAvailable(compatible && enrolled);
+
+            const settings = await getAdminBiometricLoginSettings();
+            const enabled = settings?.enabled === true;
+            setBiometricEnabled(enabled);
+            setBiometricRegisteredAt(enabled ? settings?.registeredAt || null : null);
+            setBiometricDeviceId(enabled ? settings?.deviceId || null : null);
+        } catch {
+            setBiometricAvailable(false);
+            setBiometricEnabled(false);
+        }
+    };
+
+    useEffect(() => {
+        loadBiometricState();
+    }, []);
+
+    const handleBiometricToggle = async (enabled) => {
+        if (!enabled) {
+            await clearAdminBiometricLoginSettings();
+            setBiometricEnabled(false);
+            setBiometricRegisteredAt(null);
+            setBiometricDeviceId(null);
+            return;
+        }
+
+        try {
+            const result = await LocalAuthentication.authenticateAsync({
+                promptMessage: "Enable Admin Fingerprint Login",
+                fallbackLabel: "Use device passcode",
+                disableDeviceFallback: false,
+                cancelLabel: "Cancel",
+            });
+
+            if (!result.success) return;
+
+            await saveAdminBiometricLoginSettings(buildAdminBiometricProfile());
+            await loadBiometricState();
+        } catch {
+            Alert.alert("Not Available", "Could not enable admin fingerprint login right now.");
+        }
+    };
 
     const handlePickImage = async () => {
         const pickedUri = await pickProfileImage();
@@ -865,6 +968,12 @@ export default function AdminPersonalScreen({ onBack, onSave, initialData = {} }
                 avatarUri,
             });
 
+            await updateAdminBiometricLoginUserIfEnabled({
+                name: fullName || "Admin",
+                designation: designation.trim() || "Administrator",
+                avatarUri,
+            });
+
             Alert.alert("Updated", "Personal data saved successfully.");
             onSave?.(payload);
         } catch (err) {
@@ -911,6 +1020,13 @@ export default function AdminPersonalScreen({ onBack, onSave, initialData = {} }
                 <DropdownField label="State" icon="📍" value={state} placeholder="Select state" onPress={() => openLocationPicker("state")} />
                 <DropdownField label="City" icon="📍" value={city} placeholder="Select city" onPress={() => openLocationPicker("city")} />
                 <Field label="Full Address" value={address} onChange={setAddress} placeholder="Enter full address" multiline />
+                <BiometricSection
+                    enabled={biometricEnabled}
+                    available={biometricAvailable}
+                    registeredAt={biometricRegisteredAt}
+                    deviceId={biometricDeviceId}
+                    onToggle={handleBiometricToggle}
+                />
             </ScrollView>
 
             <View style={styles.updateWrap}>
@@ -969,6 +1085,13 @@ const styles = StyleSheet.create({
     addressSection: { marginTop: 24, marginBottom: 16, paddingTop: 20, borderTopWidth: 1, borderTopColor: C.border },
     addressTitle: { color: C.white, fontSize: 16, fontWeight: "700" },
     addressSub: { color: C.gray, fontSize: 12, marginTop: 3 },
+    securitySection: { marginTop: 10, marginBottom: 20 },
+    securityTitle: { color: C.white, fontSize: 16, fontWeight: "700", marginBottom: 10 },
+    securityCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.darkCard, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14 },
+    securityTextWrap: { flex: 1, paddingRight: 12 },
+    securityLabel: { color: C.white, fontSize: 14, fontWeight: "700" },
+    securitySub: { color: C.gray, fontSize: 12, marginTop: 4 },
+    securityMeta: { color: C.gray, fontSize: 11, lineHeight: 16, marginTop: 8 },
     updateWrap: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 30 : 18, borderTopWidth: 1, borderTopColor: C.border },
     updateBtn: { backgroundColor: "#2F6E8E", borderRadius: 30, minHeight: 54, alignItems: "center", justifyContent: "center" },
     updateTxt: { color: C.white, fontSize: 16, fontWeight: "700" },

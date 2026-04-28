@@ -120,7 +120,7 @@ public class Employee {
     @Column(name = "monthly_salary")
     private double monthlySalary;
 
-    @Column(name = "profile_image", columnDefinition = "TEXT")
+    @Column(name = "profile_image", columnDefinition = "LONGTEXT")
     private String profileImage;
 
     @Column(name = "created_at")

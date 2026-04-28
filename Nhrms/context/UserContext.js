@@ -142,6 +142,7 @@ export function UserProvider({ children }) {
                 updated.firstName = first;
                 updated.lastName = last;
             }
+            updateBiometricLoginUserIfEnabled(updated);
             return updated;
         });
     };
