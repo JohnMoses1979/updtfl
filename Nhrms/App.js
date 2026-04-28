@@ -7,6 +7,7 @@
  */
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FirstScreen, SignUpFlow } from "./auth/Signup";
 import SignIn from "./auth/Signin";
 import ForgotPassword from "./auth/Forgotpassword";
@@ -27,7 +28,7 @@ import AdminLeaveScreen from "./adminscreens/Adminleave";
 import AdminPayrollScreen from "./adminscreens/Adminpayroll";
 import PerformanceScreen from "./adminscreens/Adminperformance";
 import TasksScreen from "./adminscreens/Admintask";
-import { UserProvider } from "./context/UserContext";
+import { UserProvider, useUser } from "./context/UserContext";
 import AdminProfileScreen from "./adminscreens/AdminProfileScreen";
 import AdminPersonalScreen from "./adminscreens/AdminPersonalScreen";
 const TABS = [
@@ -57,6 +58,7 @@ function BottomTabBar({ activeTab, onTabPress }) {
   );
 }
 function InnerApp() {
+  const { logout } = useUser();
   const [screen, setScreen] = useState("landing");
   const [adminProfile, setAdminProfile] = useState({});
   const [activeTab, setActiveTab] = useState(0);
@@ -72,7 +74,11 @@ function InnerApp() {
       setScreen(goBackScreen);
     },
   });
-  const doLogout = () => { setActiveTab(0); setScreen("landing"); };
+  const doLogout = () => {
+    logout && logout();
+    setActiveTab(0);
+    setScreen("landing");
+  };
   if (screen === "landing") {
     return (
       <FirstScreen
@@ -95,7 +101,11 @@ function InnerApp() {
         onBack={() => setScreen("landing")}
         goToSignUp={() => setScreen("signup")}
         onLoginSuccess={() => { setActiveTab(0); setScreen("app"); }}
-        onAdminSuccess={() => setScreen("admin")}
+        onAdminSuccess={() => {
+          logout && logout();
+          setActiveTab(0);
+          setScreen("admin");
+        }}
         onForgotPassword={() => setScreen("forgotPassword")}
       />
     );
@@ -211,9 +221,11 @@ function InnerApp() {
 }
 export default function App() {
   return (
-    <UserProvider>
-      <InnerApp />
-    </UserProvider>
+    <SafeAreaProvider>
+      <UserProvider>
+        <InnerApp />
+      </UserProvider>
+    </SafeAreaProvider>
   );
 }
 const styles = StyleSheet.create({

@@ -5,10 +5,11 @@
  */
 import React, { useState, useEffect } from "react";
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Platform, Modal, Alert, TextInput,
   ActivityIndicator, RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BASE_URL } from "../api/config";
 import { useUser } from "../context/UserContext";
 

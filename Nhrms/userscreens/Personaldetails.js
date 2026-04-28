@@ -628,7 +628,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -638,6 +637,7 @@ import {
   useWindowDimensions,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppDatePickerModal from "../components/AppDatePickerModal";
 import AppOptionPickerModal from "../components/AppOptionPickerModal";
@@ -700,6 +700,11 @@ const C = {
   border: "#1a3a5c",
   avatarBg: "#163352",
 };
+
+function getSaveableAvatarUri(uri) {
+  if (!uri || typeof uri !== "string") return "";
+  return uri.startsWith("data:") ? "" : uri;
+}
 
 function TopNav({ onBack }) {
   return (
@@ -868,6 +873,7 @@ export default function PersonalDataScreen({ onBack, onSave, initialData = {} })
     const trimmedFirst = firstName.trim();
     const trimmedLast = lastName.trim();
     const fullName = `${trimmedFirst} ${trimmedLast}`.trim();
+    const saveableAvatarUri = getSaveableAvatarUri(avatarUri);
 
     const payload = {
       firstName: trimmedFirst,
@@ -879,7 +885,7 @@ export default function PersonalDataScreen({ onBack, onSave, initialData = {} })
       state,
       city,
       address: address.trim(),
-      avatarUri,
+      avatarUri: saveableAvatarUri,
     };
 
     setSaving(true);
@@ -906,7 +912,7 @@ export default function PersonalDataScreen({ onBack, onSave, initialData = {} })
         state,
         city,
         address: address.trim(),
-        avatarUri,
+        avatarUri: saveableAvatarUri || avatarUri,
       });
 
       Alert.alert("✅ Updated", "Personal data saved successfully.");

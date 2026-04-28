@@ -297,7 +297,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -306,6 +305,7 @@ import {
   useWindowDimensions,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const C = {
   bg: "#112235",

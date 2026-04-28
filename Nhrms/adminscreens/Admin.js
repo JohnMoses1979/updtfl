@@ -2260,9 +2260,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  TextInput, SafeAreaView, StatusBar, Modal, KeyboardAvoidingView,
+  TextInput, StatusBar, Modal, KeyboardAvoidingView,
   Platform, Image, ActivityIndicator, Alert, RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AdminNotificationModal from "../components/AdminNotificationModal";
 import { notificationApi } from "../api/notificationApi";
 import { messageApi } from "../api/messageApi";
@@ -2309,6 +2310,23 @@ function formatPayroll(amount) {
   if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
   if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
   return `₹${Math.round(amount)}`;
+}
+
+function formatTime12Hour(timeValue) {
+  if (!timeValue) return "";
+  const raw = String(timeValue).trim();
+  if (!raw || raw === "â€”" || raw === "-") return "";
+
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!match) return raw;
+
+  let hour = Number(match[1]);
+  const minute = match[2];
+  if (Number.isNaN(hour)) return raw;
+
+  const suffix = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${suffix}`;
 }
 
 function isLeaveActiveToday(leave) {
@@ -2440,7 +2458,11 @@ export default function Admin({ onNavigate, profile = {}, onNotificationPress })
         presentList: presentList.map((employee) => ({
           id: employee.id || employee.empId,
           title: getEmployeeDisplayName(employee),
-          subtitle: [employee.empId, employee.checkIn, employee.checkOut].filter(Boolean).join("  •  "),
+          subtitle: [
+            employee.empId,
+            employee.checkIn ? `In ${formatTime12Hour(employee.checkIn)}` : "",
+            employee.checkOut ? `Out ${formatTime12Hour(employee.checkOut)}` : "",
+          ].filter(Boolean).join("  •  "),
         })),
         leaveList: leaveList.map((leave) => ({
           id: leave.id || leave.employeeId,

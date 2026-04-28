@@ -876,6 +876,7 @@ public class AuthService {
         res.setEmail(employee.getEmail());
         res.setEmpId(employee.getEmpId());
         res.setDesignation(employee.getDesignation());
+        res.setAvatarUri(employee.getProfileImage());
         res.setFaceImagePaths(employee.getFaceImagePaths());
         return res;
     }

@@ -1872,7 +1872,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   RefreshControl,
   TouchableOpacity,
@@ -1884,6 +1883,7 @@ import {
   Platform,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
@@ -2128,7 +2128,7 @@ function VerifyModal({ visible, isClockedIn, onSuccess, onCancel }) {
   }, [visible]);
 
   useEffect(() => {
-    if (phase === "camera" || phase === "countdown") {
+    if (phase === "camera" || phase === "countdown" || phase === "capturing") {
       const loop = Animated.loop(
         Animated.timing(scanAnim, {
           toValue: 1,
@@ -2165,18 +2165,10 @@ function VerifyModal({ visible, isClockedIn, onSuccess, onCancel }) {
       );
       return;
     }
-    setPhase("countdown");
-    let count = 3;
-    setCountdown(count);
-    countdownRef.current = setInterval(async () => {
-      count -= 1;
-      if (count > 0) {
-        setCountdown(count);
-      } else {
-        clearInterval(countdownRef.current);
-        await captureAndVerify();
-      }
-    }, 1000);
+    setPhase("capturing");
+    setFaceState("checking");
+    setFaceSub("Capturing face...");
+    captureAndVerify();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -2365,7 +2357,7 @@ function VerifyModal({ visible, isClockedIn, onSuccess, onCancel }) {
   });
 
   // Whether the camera UI should be visible to the user
-  const showCameraUI = phase === "camera" || phase === "countdown";
+  const showCameraUI = phase === "camera" || phase === "countdown" || phase === "capturing";
 
   if (!visible) return null;
 
@@ -2465,8 +2457,8 @@ function VerifyModal({ visible, isClockedIn, onSuccess, onCancel }) {
                             ]}
                           >
                             <Text style={ms.pillTxt}>
-                              {phase === "countdown"
-                                ? `Taking photo in ${countdown}...`
+                              {phase === "countdown" || phase === "capturing"
+                                ? "Capturing face..."
                                 : faceReady
                                   ? "✓ Ready — tap Capture"
                                   : "Look straight at the camera"}

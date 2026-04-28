@@ -42,17 +42,19 @@ export async function pickProfileImage() {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ["images"],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.8,
+            quality: 0.45,
+            base64: false,
         });
 
         if (result.canceled || !result.assets?.length) {
             return null;
         }
 
-        return result.assets[0].uri;
+        const asset = result.assets[0];
+        return asset.uri;
     } catch (err) {
         console.warn("[pickProfileImage] Error:", err.message);
         return null;

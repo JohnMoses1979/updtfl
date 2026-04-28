@@ -10,8 +10,9 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  SafeAreaView, StatusBar, Alert, ActivityIndicator, RefreshControl,
+  StatusBar, Alert, ActivityIndicator, RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { BASE_URL } from "../api/config";
 const C = {
   bg: "#112235", card: "#FFFFFF", text: "#F0EDE8", textDark: "#0f1e30",

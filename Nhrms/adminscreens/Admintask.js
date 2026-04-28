@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Modal,
   TextInput,
@@ -16,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import AppDatePickerModal from '../components/AppDatePickerModal';
 import { taskApi } from '../api/taskapi';
 import { employeeApi } from '../api/employeeApi';

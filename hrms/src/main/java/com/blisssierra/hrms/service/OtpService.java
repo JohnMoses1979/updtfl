@@ -145,6 +145,9 @@ public class OtpService {
     @Value("${otp.validity.minutes:5}")
     private int otpValidityMinutes;
 
+    @Value("${app.email.fail-open-on-error:true}")
+    private boolean emailFailOpenOnError;
+
     @Autowired
     private OtpRepository otpRepository;
 
@@ -171,7 +174,16 @@ public class OtpService {
 
         log.info("Generated OTP for {}: expires in {} min", email, otpValidityMinutes);
 
-        emailService.sendOtpEmail(email, employeeName, otp);
+        try {
+            emailService.sendOtpEmail(email, employeeName, otp);
+        } catch (Exception e) {
+            if (!emailFailOpenOnError) {
+                throw e;
+            }
+
+            log.warn("OTP email delivery failed for {}: {}", email, e.getMessage());
+            log.warn("Email fail-open is enabled. Use this OTP for local testing: email={}, otp={}", email, otp);
+        }
 
         return otp;
     }

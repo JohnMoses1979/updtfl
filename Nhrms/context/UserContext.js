@@ -40,6 +40,7 @@
  */
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Platform } from "react-native";
+import { updateBiometricLoginUserIfEnabled } from "../utils/biometricLogin";
 
 // Safe AsyncStorage wrapper (works on web too)
 const storage = {
@@ -132,6 +133,7 @@ export function UserProvider({ children }) {
                 updated.firstName = first;
                 updated.lastName = last;
             }
+            updateBiometricLoginUserIfEnabled(updated);
             return updated;
         });
     };

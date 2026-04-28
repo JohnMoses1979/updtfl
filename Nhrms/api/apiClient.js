@@ -1,9 +1,11 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-const WEB_HOST = "16.112.62.13";
+// const WEB_HOST = "16.112.62.13";
+const WEB_HOST = "192.168.0.41";
 const PORT = "8080";
-const FALLBACK_MOBILE_HOST = "16.112.62.13";
+// const FALLBACK_MOBILE_HOST = "16.112.62.13";
+const FALLBACK_MOBILE_HOST = "192.168.0.41";
 
 function extractHost(candidate) {
   if (!candidate || typeof candidate !== "string") return null;
@@ -16,7 +18,8 @@ function extractHost(candidate) {
 
 function resolveMobileHost() {
   
-  return "16.112.62.13";
+  // return "16.112.62.13";
+  return "192.168.0.41";
 }
 
 const API_HOST = Platform.OS === "web" ? WEB_HOST : resolveMobileHost();

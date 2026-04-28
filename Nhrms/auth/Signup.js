@@ -811,7 +811,6 @@ import {
   TextInput,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   Image,
   ImageBackground,
   Modal,
@@ -819,6 +818,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { apiSignup, apiUploadFace, apiVerifyOtp} from "../api/authService";
 

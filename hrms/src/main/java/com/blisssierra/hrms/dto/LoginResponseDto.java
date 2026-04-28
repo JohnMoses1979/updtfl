@@ -62,6 +62,9 @@ public class LoginResponseDto {
     /** Job title / designation. Null on error. */
     private String designation;
 
+    /** Personal profile photo URI/base64 saved from the profile screen. */
+    private String avatarUri;
+
     /**
      * Comma-separated absolute file-system paths of the 3 face images
      * captured during signup (stored by FileStorageService).

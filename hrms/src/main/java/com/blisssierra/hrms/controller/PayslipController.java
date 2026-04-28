@@ -1,19 +1,35 @@
 package com.blisssierra.hrms.controller;
 
-import com.itextpdf.text.*;
-import com.itextpdf.text.pdf.*;
-import com.blisssierra.hrms.entity.Employee;
-import com.blisssierra.hrms.entity.Salary;
-import com.blisssierra.hrms.repository.EmployeeRepository;
-import com.blisssierra.hrms.repository.SalaryRepository;
+import java.io.ByteArrayOutputStream;
+import java.time.LocalDate;
+import java.time.Month;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.io.ByteArrayOutputStream;
-import java.time.LocalDate;
-import java.time.Month;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.blisssierra.hrms.entity.Employee;
+import com.blisssierra.hrms.entity.Salary;
+import com.blisssierra.hrms.repository.EmployeeRepository;
+import com.blisssierra.hrms.repository.SalaryRepository;
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Chunk;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.Image;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.Rectangle;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 
 @RestController
 @RequestMapping("/api/payslip")
@@ -42,6 +58,26 @@ public class PayslipController {
                         @PathVariable int month,
                         @PathVariable int year) {
                 return buildPayslipResponse(empId, month, year);
+        }
+
+              @GetMapping("/by-emp/{empCode}/{month}/{year}")
+        public ResponseEntity<?> getPayslipByEmpCode(
+                        @PathVariable String empCode,
+                        @PathVariable int month,
+                        @PathVariable int year) {
+                Employee emp = employeeRepo.findByEmpId(empCode.trim().toUpperCase())
+                                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                return buildPayslipResponse(emp.getId(), month, year);
+        }
+
+              @GetMapping("/download/by-emp/{empCode}/{month}/{year}")
+        public ResponseEntity<byte[]> downloadPdfByEmpCode(
+                        @PathVariable String empCode,
+                        @PathVariable int month,
+                        @PathVariable int year) {
+                Employee emp = employeeRepo.findByEmpId(empCode.trim().toUpperCase())
+                                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                return generatePdf(emp.getId(), month, year);
         }
 
         // ✅ DOWNLOAD LAST MONTH PDF
