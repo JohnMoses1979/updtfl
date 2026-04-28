@@ -1,16 +1,19 @@
 package com.blisssierra.hrms.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 /**
  * Request body for POST /api/auth/login
  *
  * Sent by apiLogin() in api/authService.js:
+ * Admin login payload:
  * {
- * "empId": "EMP001",
- * "password": "secret123"
+ *   "username": "admin01",
+ *   "password": "secret123",
+ *   "loginType": "ADMIN",
+ *   "biometricVerified": true
  * }
  *
  * Note: empId is normalised to UPPERCASE in AuthService.login()
@@ -27,10 +30,21 @@ public class LoginRequestDto {
      */
     private String empId;
 
+    /** Admin username or legacy employee username. */
+    private String username;
+
     /**
      * Plain-text password.
      * AuthService compares this directly against the stored value.
      * In production, replace with BCrypt: encoder.matches(raw, stored).
      */
     private String password;
+
+    /**
+     * Required login portal: ADMIN or EMPLOYEE.
+     */
+    private String loginType;
+
+    /** Frontend confirms biometric success before final admin login. */
+    private Boolean biometricVerified;
 }

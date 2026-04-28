@@ -19,6 +19,4 @@ public class LeaveResponseDTO {
     private String email;
     private String empId;
     private String designation;
-    private String faceImagePaths;
-
 }

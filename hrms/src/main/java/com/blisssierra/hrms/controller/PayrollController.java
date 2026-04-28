@@ -151,6 +151,7 @@ public class PayrollController {
     // ── Existing endpoints (unchanged) ───────────────────────────────────────
 
     @PostMapping("/checkin/{empId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #empId)")
     public ResponseEntity<?> checkIn(@PathVariable String empId) {
         log.info("POST /api/payroll/checkin/{}", empId);
         if (empId == null || empId.isBlank())
@@ -160,6 +161,7 @@ public class PayrollController {
     }
 
     @PostMapping("/checkout/{empId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #empId)")
     public ResponseEntity<?> checkOut(@PathVariable String empId) {
         log.info("POST /api/payroll/checkout/{}", empId);
         if (empId == null || empId.isBlank())
@@ -173,6 +175,7 @@ public class PayrollController {
     // ── GET current month salary by numeric DB id ─────────────────────────────
 
     @GetMapping("/salary/{employeeId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.ownsById(authentication, #employeeId)")
     public ResponseEntity<?> getSalaryByNumericId(@PathVariable Long employeeId) {
         log.info("GET /api/payroll/salary/{}", employeeId);
         SalaryResponseDto dto = salaryService.getCurrentMonthSalary(employeeId);
@@ -182,6 +185,7 @@ public class PayrollController {
     // ── GET salary by empId string ────────────────────────────────────────────
 
     @GetMapping("/salary/by-emp/{empId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #empId)")
     public ResponseEntity<?> getSalaryByEmpId(@PathVariable String empId) {
         log.info("GET /api/payroll/salary/by-emp/{}", empId);
         return employeeRepository.findByEmpId(empId.trim().toUpperCase())
@@ -194,6 +198,7 @@ public class PayrollController {
     // Used by PayrollHistory.js frontend screen
 
     @GetMapping("/history/{employeeId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.ownsById(authentication, #employeeId)")
     public ResponseEntity<?> getSalaryHistory(@PathVariable Long employeeId) {
         log.info("GET /api/payroll/history/{}", employeeId);
         List<Salary> records = salaryRepository.findByEmployeeIdOrderByYearDescMonthDesc(employeeId);
@@ -251,6 +256,7 @@ public class PayrollController {
     // ── NEW: Salary breakdown endpoint for SalaryBreakdown.js ────────────────
 
     @GetMapping("/breakdown/{employeeId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or @ownershipService.ownsById(authentication, #employeeId)")
     public ResponseEntity<?> getSalaryBreakdown(
             @PathVariable Long employeeId,
             @RequestParam(defaultValue = "0") int month,

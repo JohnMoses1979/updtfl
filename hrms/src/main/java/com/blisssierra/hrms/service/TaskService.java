@@ -255,6 +255,15 @@ public class TaskService {
         taskRepository.save(task);
     }
 
+    public boolean isAssignedToAuthenticatedUser(Long taskId, String empId) {
+        if (taskId == null || empId == null || empId.trim().isEmpty()) {
+            return false;
+        }
+        return taskRepository.findById(taskId)
+                .map(task -> empId.trim().equalsIgnoreCase(task.getAssigneeEmployeeId()))
+                .orElse(false);
+    }
+
     public void deleteTask(Long taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found: " + taskId));

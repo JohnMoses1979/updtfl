@@ -1,9 +1,6 @@
 // package com.blisssierra.hrms.entity;
-
 // import java.time.LocalDateTime;
-
 // import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 // import jakarta.persistence.Column;
 // import jakarta.persistence.Entity;
 // import jakarta.persistence.GeneratedValue;
@@ -15,7 +12,6 @@
 // import lombok.AllArgsConstructor;
 // import lombok.Data;
 // import lombok.NoArgsConstructor;
-
 // @Entity
 // @Table(name = "employees")
 // @Data
@@ -23,61 +19,45 @@
 // @AllArgsConstructor
 // @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 // public class Employee {
-
 //     @Id
 //     @GeneratedValue(strategy = GenerationType.IDENTITY)
 //     private Long id;
-
 //     @Column(nullable = false)
 //     private String name;
-
 //     @Column(nullable = false, unique = true)
 //     private String email;
-
 //     @Column(name = "emp_id", nullable = false, unique = true)
 //     private String empId;
-
 //     @Column(nullable = false)
 //     private String designation;
-
 //     @Column(nullable = false)
 //     private String password;
-
 //     @Column(name = "face_image_paths", columnDefinition = "TEXT")
-//     private String faceImagePaths;
-
 //     @Column(name = "is_verified", nullable = false)
 //     private boolean verified = false;
-
 //     @Column(name = "emp_code")
 //     private String empCode;
-
 //     @Column(name = "monthly_salary")
 //     private double monthlySalary;
-
 //     @Column(name = "profile_image", columnDefinition = "TEXT")
 //     private String profileImage;
-
 //     @Column(name = "created_at")
 //     private LocalDateTime createdAt;
-
 //     @Column(name = "updated_at")
 //     private LocalDateTime updatedAt;
-
 //     @PrePersist
 //     protected void onCreate() {
 //         createdAt = LocalDateTime.now();
 //         updatedAt = LocalDateTime.now();
 //     }
-
 //     @PreUpdate
 //     protected void onUpdate() {
 //         updatedAt = LocalDateTime.now();
 //     }
 // }
-
 package com.blisssierra.hrms.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -99,7 +79,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Employee {
 
     @Id
@@ -121,8 +101,8 @@ public class Employee {
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "face_image_paths", columnDefinition = "TEXT")
-    private String faceImagePaths;
+    @Column(name = "username", unique = true, length = 120)
+    private String username;
 
     @Column(name = "is_verified", nullable = false)
     private boolean verified = false;
@@ -130,6 +110,9 @@ public class Employee {
     // NEW: Admin must approve employee before they can log in
     @Column(name = "is_approved", nullable = false)
     private boolean approved = false;
+
+    @Column(name = "biometric_enabled", nullable = false)
+    private boolean biometricEnabled = false;
 
     @Column(name = "emp_code")
     private String empCode;
@@ -156,4 +139,15 @@ public class Employee {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    @Column(name = "role", nullable = false, length = 30)
+    private String role = "ROLE_EMPLOYEE";
+
+    // Merged from legacy app_user table
+    @Column(name = "join_date")
+    private LocalDate joinDate;
+
+    // Merged from legacy app_user table
+    @Column(name = "status", length = 30)
+    private String status = "ACTIVE";
 }

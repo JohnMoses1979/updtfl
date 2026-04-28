@@ -3152,6 +3152,10 @@ export default function CheckInScreen({ onTabPress, activeTab = 1 }) {
 
   const handleVerified = async () => {
     setModalVisible(false);
+    // If biometric gave us login data, update UserContext
+    if (result?.loginData?.status === 'success') {
+      login(result.loginData);  // navigates to employee's own account
+    }
     await refreshAttendanceData(false);
   };
 

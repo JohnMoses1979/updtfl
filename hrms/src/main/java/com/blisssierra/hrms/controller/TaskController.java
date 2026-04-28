@@ -1,6 +1,7 @@
 package com.blisssierra.hrms.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.blisssierra.hrms.dto.ApiResponse;
@@ -82,6 +83,7 @@ public class TaskController {
      * Employee.empId during task creation.
      */
     @GetMapping("/api/tasks/user/{employeeId}")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #employeeId)")
     public ApiResponse<List<Task>> getTasksByEmployeeId(
             @PathVariable String employeeId) {
         return new ApiResponse<>(true, "User tasks fetched successfully",
@@ -89,12 +91,14 @@ public class TaskController {
     }
 
     @GetMapping("/api/tasks/user/{employeeId}/notifications")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #employeeId)")
     public ApiResponse<List<NotificationDto>> getUserTaskNotifications(@PathVariable String employeeId) {
         return new ApiResponse<>(true, "User task notifications fetched successfully",
                 taskService.getUserTaskNotifications(employeeId));
     }
 
     @PutMapping("/api/tasks/user/{taskId}")
+    @PreAuthorize("hasRole('ADMIN') or @taskService.isAssignedToAuthenticatedUser(#taskId, authentication.name)")
     public ApiResponse<Task> updateTaskByUser(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskUserUpdateRequest request) {
@@ -103,6 +107,7 @@ public class TaskController {
     }
 
     @PutMapping("/api/tasks/user/{taskId}/notification-read")
+    @PreAuthorize("hasRole('ADMIN') or @taskService.isAssignedToAuthenticatedUser(#taskId, authentication.name)")
     public ApiResponse<Void> markUserTaskNotificationAsRead(@PathVariable Long taskId) {
         taskService.markUserTaskNotificationAsRead(taskId);
         return new ApiResponse<>(true, "User task notification marked as read", null);
@@ -119,6 +124,7 @@ public class TaskController {
      * Returns all employees as UserOptionDto for the assignment dropdown.
      */
     @GetMapping("/api/users")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<UserOptionDto>> getUsers() {
         List<UserOptionDto> list = taskService.getAllEmployees().stream()
                 .map(e -> new UserOptionDto(e.getId(), e.getEmpId(), e.getName()))
@@ -131,6 +137,7 @@ public class TaskController {
      * Used by admin task page to find employees when assigning a task.
      */
     @GetMapping("/api/users/search")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<UserOptionDto>> searchUsers(
             @RequestParam(defaultValue = "") String query) {
         List<UserOptionDto> list = taskService.searchEmployees(query).stream()
@@ -144,6 +151,7 @@ public class TaskController {
      * Look up a single employee by their empId string.
      */
     @GetMapping("/api/users/employee/{employeeId}")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #employeeId)")
     public ApiResponse<UserOptionDto> getUserByEmployeeId(
             @PathVariable String employeeId) {
         var emp = taskService.getEmployeeByEmpId(employeeId);

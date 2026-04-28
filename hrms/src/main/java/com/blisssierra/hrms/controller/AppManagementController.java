@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.blisssierra.hrms.dto.AddEmployeeRequest;
-import com.blisssierra.hrms.entity.AppUser;
+import com.blisssierra.hrms.entity.Employee;
 import com.blisssierra.hrms.service.AppManagementService;
 
 @RestController
@@ -27,12 +27,12 @@ public class AppManagementController {
     }
 
     @PostMapping
-    public ResponseEntity<AppUser> addEmployee(@RequestBody AddEmployeeRequest request) {
+    public ResponseEntity<Employee> addEmployee(@RequestBody AddEmployeeRequest request) {
         return ResponseEntity.ok(appManagementService.addEmployee(request));
     }
 
     @GetMapping
-    public ResponseEntity<List<AppUser>> getEmployees() {
+    public ResponseEntity<List<Employee>> getEmployees() {
         return ResponseEntity.ok(appManagementService.getAllEmployees());
     }
 }

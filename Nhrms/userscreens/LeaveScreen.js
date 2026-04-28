@@ -342,12 +342,17 @@ export default function LeaveScreen({ onBack }) {
   // userId: backend uses numeric id from User entity; user.empId used as fallback
   // For full integration, userId should come from login response.
   // Using 1 as default until backend returns userId in LoginResponseDto.
-  const userId = user.userId;
+  const userId = Number(user?.userId);
+  const hasValidUserId = Number.isFinite(userId) && userId > 0;
 
   const fetchLeaves = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
+      if (!hasValidUserId) {
+        setLeaves([]);
+        return;
+      }
       const res = await fetch(`${BASE_URL}/api/leave/user/${userId}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
@@ -360,7 +365,7 @@ export default function LeaveScreen({ onBack }) {
     }
   };
 
-  useEffect(() => { fetchLeaves(); }, [userId]);
+  useEffect(() => { fetchLeaves(); }, [userId, hasValidUserId]);
 
   const filtered = leaves.filter(
     (l) => (l.status?.toUpperCase() ?? "") === activeStatus.toUpperCase()
@@ -372,21 +377,22 @@ export default function LeaveScreen({ onBack }) {
   const handleSubmit = async ({ startDate, endDate, leaveType, reason }) => {
     setSubmitting(true);
     try {
-      console.log("FINAL USER ID SENT:", user?.userId);
+      if (!hasValidUserId) {
+        throw new Error("Session missing employee ID. Please sign in again.");
+      }
       const res = await fetch(`${BASE_URL}/api/leave/apply`, {
         
         method: "POST",
         headers: { "Content-Type": "application/json" },
         
         body: JSON.stringify({
-          employeeId: Number(user?.userId),   // 👈 FORCE NUMBER
+          employeeId: userId,
           startDate: startDate.toISOString().split("T")[0],
           endDate: endDate.toISOString().split("T")[0],
           leaveType,
           reason,
         }),
       });
-      console.log("FINAL USER ID SENT:", user?.userId);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       Alert.alert("✅ Submitted", "Your leave request has been submitted for review.");
       setModalVisible(false);

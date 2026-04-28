@@ -5,54 +5,64 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.blisssierra.hrms.dto.AddEmployeeRequest;
-import com.blisssierra.hrms.entity.AppUser;
-import com.blisssierra.hrms.repository.AppManagementRepository;
+import com.blisssierra.hrms.entity.Employee;
+import com.blisssierra.hrms.repository.EmployeeRepository;
 
 @Service
 public class AppManagementService {
 
-    private final AppManagementRepository appManagementRepository;
+    private final EmployeeRepository employeeRepository;
 
-    public AppManagementService(AppManagementRepository appManagementRepository) {
-        this.appManagementRepository = appManagementRepository;
+    public AppManagementService(EmployeeRepository employeeRepository) {
+        this.employeeRepository = employeeRepository;
     }
 
-    public AppUser addEmployee(AddEmployeeRequest request) {
+    public Employee addEmployee(AddEmployeeRequest request) {
         if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
             throw new RuntimeException("Employee ID is required");
         }
-
         if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
             throw new RuntimeException("Full Name is required");
         }
 
-        if (request.getRole() == null || request.getRole().trim().isEmpty()) {
-            throw new RuntimeException("Role is required");
-        }
+        String employeeId = request.getEmployeeId().trim().toUpperCase();
+        String email = request.getEmail() != null && !request.getEmail().trim().isEmpty()
+                ? request.getEmail().trim().toLowerCase()
+                : employeeId.toLowerCase() + "@nhrms.local";
 
-        String employeeId = request.getEmployeeId().trim();
-        if (appManagementRepository.existsByEmployeeId(employeeId)) {
+        if (employeeRepository.existsByEmpId(employeeId)) {
             throw new RuntimeException("Employee ID already exists");
         }
+        if (employeeRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email already exists");
+        }
 
-        AppUser user = new AppUser();
-        user.setEmployeeId(employeeId);
-        user.setFullName(request.getFullName().trim());
-        user.setEmail(
-                request.getEmail() != null && !request.getEmail().trim().isEmpty()
-                        ? request.getEmail().trim()
-                        : employeeId.toLowerCase() + "@nhrms.local"
-        );
-        user.setRole(request.getRole().trim().toUpperCase());
-        user.setDesignation(request.getDesignation());
-        user.setSalary(request.getSalary());
-        user.setJoinDate(request.getJoinDate());
-        user.setStatus("ACTIVE");
+        Employee employee = new Employee();
+        employee.setEmpId(employeeId);
+        employee.setEmpCode(employeeId);
+        employee.setName(request.getFullName().trim());
+        employee.setEmail(email);
+        employee.setRole(normalizeRole(request.getRole()));
+        employee.setDesignation(request.getDesignation() != null ? request.getDesignation().trim() : null);
+        employee.setMonthlySalary(request.getSalary() != null ? request.getSalary().doubleValue() : 0.0);
+        employee.setJoinDate(request.getJoinDate());
+        employee.setStatus("ACTIVE");
+        employee.setVerified(true);
+        employee.setApproved(true);
+        employee.setPassword("changeme123");
 
-        return appManagementRepository.save(user);
+        return employeeRepository.save(employee);
     }
 
-    public List<AppUser> getAllEmployees() {
-        return appManagementRepository.findAllByOrderByIdDesc();
+    public List<Employee> getAllEmployees() {
+        return employeeRepository.findAll();
+    }
+
+    private String normalizeRole(String inputRole) {
+        if (inputRole == null || inputRole.trim().isEmpty()) {
+            return "ROLE_EMPLOYEE";
+        }
+        String role = inputRole.trim().toUpperCase();
+        return role.startsWith("ROLE_") ? role : "ROLE_" + role;
     }
 }

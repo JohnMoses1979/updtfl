@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,6 +47,7 @@ public class AttendanceApiController {
 
     // ── POST /api/attendance/check-in ────────────────────────────────────────
     @PostMapping("/check-in")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #req.empId)")
     public ResponseEntity<?> checkIn(@RequestBody CheckInOutRequest req) {
         log.info("POST /api/attendance/check-in — empId={}", req.getEmpId());
         if (req.getEmpId() == null || req.getEmpId().trim().isEmpty()) {
@@ -59,6 +61,7 @@ public class AttendanceApiController {
 
     // ── POST /api/attendance/check-out ───────────────────────────────────────
     @PostMapping("/check-out")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #req.empId)")
     public ResponseEntity<?> checkOut(@RequestBody CheckInOutRequest req) {
         log.info("POST /api/attendance/check-out — empId={}", req.getEmpId());
         if (req.getEmpId() == null || req.getEmpId().trim().isEmpty()) {
@@ -77,6 +80,7 @@ public class AttendanceApiController {
 
     // ── GET /api/attendance?date=YYYY-MM-DD ──────────────────────────────────
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AttendanceRecordDto>> getByDate(
             @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         LocalDate queryDate = (date != null) ? date : LocalDate.now();
@@ -87,6 +91,7 @@ public class AttendanceApiController {
 
     // ── GET /api/attendance/all ──────────────────────────────────────────────
     @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AttendanceRecordDto>> getAll() {
         log.info("GET /api/attendance/all");
         List<AttendanceRecordDto> records = attendanceApiService.getAll();
@@ -94,6 +99,7 @@ public class AttendanceApiController {
     }
 
     @GetMapping("/history/{empId}")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #empId)")
     public ResponseEntity<List<AttendanceRecordDto>> getEmployeeHistory(@PathVariable String empId) {
         String normId = empId.trim().toUpperCase();
         log.info("GET /api/attendance/history/{}", normId);
@@ -117,6 +123,7 @@ public class AttendanceApiController {
     // Add to AttendanceApiController.java
 
     @GetMapping("/status/{empId}")
+    @PreAuthorize("hasRole('ADMIN') or @ownershipService.owns(authentication, #empId)")
     public ResponseEntity<?> getStatus(@PathVariable String empId) {
         String normId = empId.trim().toUpperCase();
         LocalDate today = LocalDate.now();

@@ -40,6 +40,7 @@
  */
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Platform } from "react-native";
+import { tokenStore } from "../api/tokenStore";
 
 // Safe AsyncStorage wrapper (works on web too)
 const storage = {
@@ -90,7 +91,11 @@ export function UserProvider({ children }) {
             try {
                 const stored = await storage.getItem(STORAGE_KEY);
                 if (stored) {
-                    setUser(JSON.parse(stored));
+                    const parsed = JSON.parse(stored);
+                    setUser(parsed);
+                    if (parsed?.token) {
+                        tokenStore.set(parsed.token);
+                    }
                 }
             } catch { /* ignore parse errors */ }
             finally {
@@ -113,7 +118,12 @@ export function UserProvider({ children }) {
      * login — store full user profile after authentication.
      * Shape: { userId, name, email, empId, designation, faceImagePaths }
      */
-    const login = (userData) => setUser(userData);
+    const login = (userData) => {
+        if (userData?.token) {
+            tokenStore.set(userData.token);
+        }
+        setUser(userData);
+    };
 
     /**
      * updateProfile — merge partial updates (e.g. after personal data save).
@@ -136,7 +146,10 @@ export function UserProvider({ children }) {
         });
     };
 
-    const logout = () => setUser(null);
+    const logout = () => {
+        tokenStore.clear();
+        setUser(null);
+    };
 
     // Don't render children until storage is hydrated
     // (prevents flash of "logged-out" state)

@@ -30,13 +30,21 @@ import com.blisssierra.hrms.entity.Employee;
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByEmail(String email);
 
+    Optional<Employee> findByUsername(String username);
+
     Optional<Employee> findByEmpId(String empId);
 
     boolean existsByEmail(String email);
 
+    boolean existsByUsername(String username);
+
     boolean existsByEmpId(String empId);
 
     Optional<Employee> findByEmpCode(String empCode);
+
+    List<Employee> findTop20ByOrderByNameAsc();
+
+    List<Employee> findTop20ByNameContainingIgnoreCaseOrderByNameAsc(String name);
 
     // ISSUE 1 FIX: Find employees pending admin approval
     List<Employee> findByVerifiedTrueAndApprovedFalse();
